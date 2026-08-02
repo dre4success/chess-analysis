@@ -1,0 +1,6 @@
+/target
+.DS_Store
+/reference
+SPEC.md
+PLAN.md
+AUDIT.md
