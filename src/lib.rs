@@ -1,3 +1,5 @@
+pub mod evaluation;
+
 pub fn project_name() -> &'static str {
     "chess-review"
 }
