@@ -1,6 +1,7 @@
 pub mod completion;
 pub mod evaluation;
 pub mod pgn;
+pub mod review;
 
 pub fn project_name() -> &'static str {
     "chess-review"
