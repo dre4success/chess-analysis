@@ -1,0 +1,10 @@
+[Event "Live Chess"]
+[Site "Chess.com"]
+[White "its_Inviktus"]
+[Black "Dre4success007"]
+[Result "0-1"]
+[WhiteElo "861"]
+[BlackElo "875"]
+[TimeControl "600"]
+
+1. e4 {[%timestamp 25]} 1... c6 {[%timestamp 21]} 2. d4 {[%timestamp 10]} 2... d5 {[%timestamp 14]} 3. e5 {[%timestamp 17]} 3... e6 {[%timestamp 55]} 4. f4 {[%timestamp 39]} 4... Bb4+ {[%timestamp 33]} 5. c3 {[%timestamp 26]} 5... Ba5 {[%timestamp 45]} 6. Nf3 {[%timestamp 139]} 6... Ne7 {[%timestamp 35]} 7. g3 {[%timestamp 16]} 7... O-O {[%timestamp 23]} 8. Bd3 {[%timestamp 42]} 8... Bd7 {[%timestamp 75]} 9. a3 {[%timestamp 44]} 9... b6 {[%timestamp 28]} 10. b4 {[%timestamp 9]} 10... Bxb4 {[%timestamp 178]} 11. axb4 {[%timestamp 14]} 11... c5 {[%timestamp 16]} 12. bxc5 {[%timestamp 546]} 12... bxc5 {[%timestamp 60]} 13. Ba3 {[%timestamp 58]} 13... c4 {[%timestamp 35]} 14. Bc2 {[%timestamp 34]} 14... Nbc6 {[%timestamp 20]} 15. Ba4 {[%timestamp 36]} 15... Na5 {[%timestamp 96]} 16. Bxd7 {[%timestamp 21]} 16... Qxd7 {[%timestamp 35]} 17. Bxe7 {[%timestamp 11]} 17... Qxe7 {[%timestamp 40]} 18. Rxa5 {[%timestamp 14]} 18... Qb7 {[%timestamp 125]} 19. O-O {[%timestamp 137]} 19... Rab8 {[%timestamp 45]} 20. Ra1 {[%timestamp 41]} 20... Qb2 {[%timestamp 58]} 21. Rf2 {[%timestamp 228]} 21... Qxa1 {[%timestamp 62]} 22. Nfd2 {[%timestamp 91]} 22... a5 {[%timestamp 55]} 23. Rf1 {[%timestamp 40]} 23... a4 {[%timestamp 34]} 24. g4 {[%timestamp 68]} 24... a3 {[%timestamp 23]} 25. Qa4 {[%timestamp 767]} 25... Ra8 {[%timestamp 208]} 26. Qb4 {[%timestamp 744]} 26... a2 {[%timestamp 93]} 27. Na3 {[%timestamp 134]} 27... Qxf1+ {[%timestamp 179]} 28. Kxf1 {[%timestamp 13]} 28... a1=Q+ {[%timestamp 23]} 29. Nab1 {[%timestamp 305]} 29... Rfb8 {[%timestamp 124]} 0-1

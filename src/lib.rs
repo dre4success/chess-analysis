@@ -17,5 +17,6 @@ mod test {
     }
 }
 
+pub mod analysis;
 pub mod engine;
 pub mod stockfish;
