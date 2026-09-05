@@ -4,6 +4,13 @@
 (archived in `reference/`), merged with its corrections.
 **Date:** 2 August 2026
 
+**Implementation update — 5 September 2026:** resumed the unfinished Stage 3
+worktree and implemented through the Stage 11 CLI. Automated tests, real Stockfish
+regressions and a 12-game acceptance run are recorded in `VALIDATION.md`. Stage 11's
+human semantic-label review and practice-change decision remain pending in
+`docs/ACCEPTANCE.md`; Stages 12–14 have not started. The user authorized autonomous
+implementation for this continuation, superseding the original typing workflow.
+
 ---
 
 ## How we work

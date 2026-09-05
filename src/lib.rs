@@ -22,4 +22,5 @@ pub mod detectors;
 pub mod engine;
 pub mod fetch;
 pub mod patterns;
+pub mod render;
 pub mod stockfish;

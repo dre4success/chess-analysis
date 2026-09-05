@@ -45,6 +45,7 @@ impl Nodes {
 pub struct Analysis {
     pub evaluation: Evaluation,
     pub best_uci: String,
+    pub final_best_uci: String,
     pub pv: Vec<String>,
 }
 pub trait PositionEngine {
@@ -77,7 +78,7 @@ impl UciEngine {
             .spawn()?;
         let input = child.stdin.take();
         let stdout = child.stdout.take().ok_or(EngineError::Closed)?;
-        let (tx, output) = mpsc::channel();
+        let (tx, output) = mpsc::sync_channel(256);
         let reader = thread::spawn(move || {
             let mut reader = BufReader::new(stdout);
             loop {
@@ -87,12 +88,12 @@ impl UciEngine {
                 match result {
                     Ok(0) => break,
                     Ok(_) if bytes.len() > 65_536 => {
-                        let _ = tx.send(Err(std::io::Error::other("UCI line exceeds 64 KiB")));
+                        let _ = tx.try_send(Err(std::io::Error::other("UCI line exceeds 64 KiB")));
                         break;
                     }
                     Ok(_) => {
                         if tx
-                            .send(
+                            .try_send(
                                 String::from_utf8(bytes)
                                     .map(|s| s.trim().to_owned())
                                     .map_err(std::io::Error::other),
@@ -103,7 +104,7 @@ impl UciEngine {
                         }
                     }
                     Err(e) => {
-                        let _ = tx.send(Err(e));
+                        let _ = tx.try_send(Err(e));
                         break;
                     }
                 }
@@ -215,9 +216,10 @@ impl UciEngine {
                 legal_move(position, best).map_err(EngineError::Protocol)?;
                 let (evaluation, pv) =
                     latest.ok_or_else(|| EngineError::Protocol("no exact score with PV".into()))?;
-                if pv.first().map(String::as_str) != Some(best) {
-                    return Err(EngineError::Protocol("bestmove does not match PV".into()));
-                }
+                let exact_best = pv
+                    .first()
+                    .ok_or_else(|| EngineError::Protocol("empty exact PV".into()))?
+                    .clone();
                 let mut replay = position.clone();
                 for uci in &pv {
                     let mv = legal_move(&replay, uci).map_err(EngineError::Protocol)?;
@@ -225,7 +227,8 @@ impl UciEngine {
                 }
                 return Ok(Analysis {
                     evaluation,
-                    best_uci: best.to_owned(),
+                    best_uci: exact_best,
+                    final_best_uci: best.to_owned(),
                     pv,
                 });
             }
@@ -381,5 +384,37 @@ mod tests {
             Err(EngineError::Protocol(_))
         ));
         assert!(engine.child.try_wait().unwrap().is_some());
+    }
+    #[test]
+    #[cfg(unix)]
+    fn node_cutoff_bound_does_not_replace_exact_score_or_pv() {
+        let mut engine = fake(
+            "print('info score cp 43 pv e2e4 e7e5',flush=True); print('info score cp 36 lowerbound pv d2d4',flush=True); print('bestmove d2d4',flush=True)",
+        );
+        let a = engine
+            .analyse(&Chess::default(), Color::White, Nodes::new(100).unwrap())
+            .unwrap();
+        assert_eq!(a.evaluation, Evaluation::centipawns(43));
+        assert_eq!(a.best_uci, "e2e4");
+        assert_eq!(a.final_best_uci, "d2d4");
+    }
+    #[test]
+    #[cfg(unix)]
+    fn handshake_timeout_reaps_process() {
+        let dir = tempfile::tempdir().unwrap();
+        let pidfile = dir.path().join("pid");
+        let mut cmd = Command::new("python3");
+        cmd.args([
+            "-c",
+            "import os,sys,time; open(sys.argv[1],'w').write(str(os.getpid())); time.sleep(10)",
+        ])
+        .arg(&pidfile);
+        assert!(matches!(
+            UciEngine::command(cmd, Duration::from_millis(500)),
+            Err(EngineError::Timeout)
+        ));
+        let pid = std::fs::read_to_string(pidfile).unwrap();
+        let result = Command::new("kill").args(["-0", &pid]).output().unwrap();
+        assert!(!result.status.success());
     }
 }

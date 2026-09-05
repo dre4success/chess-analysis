@@ -42,7 +42,7 @@ pub fn line_opened(ctx: &MoveContext<'_>) -> Option<ClassificationEvidence> {
                     Classification::LineOpened,
                     format!(
                         "Moving from {from} opened the {attacker}–{victim} line onto your {} on {victim}.",
-                        ctx.after.board().role_at(victim)?.char()
+                        piece_name(ctx.after.board().role_at(victim)?)
                     ),
                 ));
             }
@@ -106,6 +106,16 @@ mod tests {
     }
 }
 
+fn piece_name(role: Role) -> &'static str {
+    match role {
+        Role::Pawn => "pawn",
+        Role::Knight => "knight",
+        Role::Bishop => "bishop",
+        Role::Rook => "rook",
+        Role::Queen => "queen",
+        Role::King => "king",
+    }
+}
 fn value(role: Role) -> i32 {
     match role {
         Role::Pawn => 100,
@@ -135,12 +145,14 @@ pub fn exchange_gain(position: &Chess, square: shakmaty::Square) -> i32 {
 }
 pub fn line_onto(ctx: &MoveContext<'_>) -> Option<ClassificationEvidence> {
     let square = ctx.actual.to();
-    if exchange_gain(ctx.after, square) > 0 {
+    let material_gained = ctx.actual.capture().map(value).unwrap_or(0)
+        + ctx.actual.promotion().map(|p| value(p) - 100).unwrap_or(0);
+    if exchange_gain(ctx.after, square) > material_gained {
         Some(evidence(
             Classification::LineOnto,
             format!(
                 "Your {} landed on {square}, where the opponent has a profitable legal capture sequence.",
-                ctx.actual.role().char()
+                piece_name(ctx.actual.role())
             ),
         ))
     } else {
@@ -421,5 +433,16 @@ mod exchange_tests {
         let p = pos("4k3/4n3/8/3Q4/8/8/8/4R1K1 b - - 0 1");
         assert!(p.board().attacks_from(Square::E7).contains(Square::D5));
         assert_eq!(exchange_gain(&p, Square::D5), 0);
+    }
+    #[test]
+    fn ordinary_equal_rook_trade_has_no_landing_or_capture_cost_label() {
+        let fen = "8/pp2kppp/8/3p1p2/3RrP2/P1P4P/1P4P1/5K2 b - - 0 26";
+        let before = pos(fen);
+        let mv = crate::review::legal_move(&before, "e4d4").unwrap();
+        assert_eq!(mv.capture(), Some(Role::Rook));
+        let after = before.clone().play(mv).unwrap();
+        assert_eq!(exchange_gain(&after, Square::D4), 500);
+        assert!(!check(fen, "e4d4", line_onto));
+        assert!(!check(fen, "e4d4", capture_cost));
     }
 }

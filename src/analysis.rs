@@ -105,7 +105,7 @@ fn terminal(position: &Chess, user: Color) -> Option<Evaluation> {
             },
             0,
         ))
-    } else if position.is_game_over() || position.halfmoves() >= 100 {
+    } else if position.is_game_over() || position.halfmoves() >= 150 {
         Some(Evaluation::centipawns(0))
     } else {
         None
@@ -130,10 +130,20 @@ pub fn candidates(
         ));
     }
     let mut position = game.initial_position().clone();
+    let key = |p: &Chess| {
+        shakmaty::fen::Fen::from_position(p, shakmaty::EnPassantMode::Legal)
+            .to_string()
+            .split_whitespace()
+            .take(4)
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    let mut history = vec![key(&position)];
+    let mut automatic_draw = false;
     let mut previous = None;
     let mut shortlist = Vec::new();
     for (index, uci) in game.moves().iter().enumerate() {
-        if terminal(&position, user).is_some() {
+        if automatic_draw || terminal(&position, user).is_some() {
             break;
         }
         let before = position.clone();
@@ -141,9 +151,18 @@ pub fn candidates(
             .to_move(&position)
             .map_err(|e| EngineError::Protocol(e.to_string()))?;
         position.play_unchecked(actual);
+        let after_key = key(&position);
+        history.push(after_key.clone());
+        let repetitions = history.iter().filter(|k| **k == after_key).count();
+        automatic_draw = repetitions >= 5;
+        let claimed_draw = index + 1 == game.moves().len()
+            && game.outcome() == pgn_reader::KnownOutcome::Draw
+            && (repetitions >= 3 || position.halfmoves() >= 100);
+        let terminal_after = terminal(&position, user)
+            .or_else(|| (automatic_draw || claimed_draw).then_some(Evaluation::centipawns(0)));
         if before.turn() == user {
             let best = engine.analyse(&before, user, config.scan)?;
-            let eval_after = match terminal(&position, user) {
+            let eval_after = match terminal_after {
                 Some(e) => e,
                 None => engine.analyse(&position, user, config.scan)?.evaluation,
             };
@@ -154,15 +173,16 @@ pub fn candidates(
                     position.clone(),
                     previous.clone(),
                     actual,
+                    terminal_after,
                 ));
             }
         }
         previous = Some(before);
     }
     let mut confirmed = Vec::new();
-    for (index, before, after, previous, actual) in shortlist {
+    for (index, before, after, previous, actual, terminal_after) in shortlist {
         let best = engine.analyse(&before, user, config.deep)?;
-        let (eval_after, reply) = match terminal(&after, user) {
+        let (eval_after, reply) = match terminal_after {
             Some(e) => (e, None),
             None => {
                 let reply = engine.analyse(&after, user, config.deep)?;
@@ -172,6 +192,7 @@ pub fn candidates(
         let severity = loss(best.evaluation, eval_after);
         // A finite search can disagree with itself; never condemn its best move.
         if severity >= u64::from(config.threshold_cp)
+            && legal_move(&before, &best.final_best_uci).map_err(EngineError::Protocol)? != actual
             && legal_move(&before, &best.best_uci).map_err(EngineError::Protocol)? != actual
         {
             confirmed.push(Candidate {
@@ -220,6 +241,7 @@ mod tests {
             Ok(Analysis {
                 evaluation: Evaluation::centipawns(0),
                 best_uci: uci.clone(),
+                final_best_uci: uci.clone(),
                 pv: vec![uci],
             })
         }
@@ -285,7 +307,147 @@ mod tests {
             std::time::Duration::from_secs(60),
         )
         .unwrap();
+        let mut before = game.initial_position().clone();
+        for uci in &game.moves()[..53] {
+            let mv = uci.to_move(&before).unwrap();
+            before.play_unchecked(mv);
+        }
+        let sacrifice = game.moves()[53].to_move(&before).unwrap();
+        assert_eq!(game.moves()[53].to_string(), "a1f1");
+        let after = before.clone().play(sacrifice).unwrap();
+        for nodes in [config.scan, config.deep] {
+            let best = engine.analyse(&before, Color::Black, nodes).unwrap();
+            let reply = engine.analyse(&after, Color::Black, nodes).unwrap();
+            assert!(loss(best.evaluation, reply.evaluation) < u64::from(config.threshold_cp));
+        }
         let findings = candidates(&game, Color::Black, &mut engine, config).unwrap();
         assert!(findings.iter().all(|c| c.ply != 54));
+    }
+    #[test]
+    fn scan_shortlists_but_only_deep_search_decides() {
+        struct Script {
+            evals: std::collections::VecDeque<i32>,
+            budgets: Vec<u64>,
+        }
+        impl PositionEngine for Script {
+            fn analyse(&mut self, p: &Chess, _: Color, n: Nodes) -> Result<Analysis, EngineError> {
+                self.budgets.push(n.get());
+                let uci = if p.turn() == Color::White {
+                    "d2d4"
+                } else {
+                    "e7e5"
+                }
+                .to_owned();
+                Ok(Analysis {
+                    evaluation: Evaluation::centipawns(self.evals.pop_front().unwrap()),
+                    best_uci: uci.clone(),
+                    final_best_uci: uci.clone(),
+                    pv: vec![uci],
+                })
+            }
+        }
+        let game = LocalPgnPolicy
+            .verify(
+                crate::pgn::parse_one(b"[Result \"1-0\"]\n\n1. e4 1-0")
+                    .unwrap()
+                    .unwrap(),
+            )
+            .unwrap();
+        let mut engine = Script {
+            evals: [0, -400, 0, 0].into(),
+            budgets: vec![],
+        };
+        assert!(
+            candidates(&game, Color::White, &mut engine, AnalysisConfig::default())
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(engine.budgets, vec![150_000, 150_000, 1_000_000, 1_000_000]);
+        let mut engine = Script {
+            evals: [0, -400, 0, -300].into(),
+            budgets: vec![],
+        };
+        let confirmed =
+            candidates(&game, Color::White, &mut engine, AnalysisConfig::default()).unwrap();
+        assert_eq!(confirmed.len(), 1);
+        assert_eq!(confirmed[0].eval_after, Evaluation::centipawns(-300));
+    }
+    #[test]
+    fn final_threefold_draw_never_reaches_engine() {
+        let game = LocalPgnPolicy
+            .verify(
+                crate::pgn::parse_one(
+                    b"[Result \"1/2-1/2\"]\n\n1. Nf3 Nf6 2. Ng1 Ng8 3. Nf3 Nf6 4. Ng1 Ng8 1/2-1/2",
+                )
+                .unwrap()
+                .unwrap(),
+            )
+            .unwrap();
+        let mut engine = Constant { calls: vec![] };
+        assert!(
+            candidates(&game, Color::Black, &mut engine, AnalysisConfig::default())
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(engine.calls.len(), 7);
+    }
+
+    #[test]
+    fn cap_is_applied_after_all_confirmations_for_both_colours() {
+        struct E {
+            user: Color,
+            actuals: Vec<(Chess, shakmaty::Move)>,
+            deep_calls: usize,
+        }
+        impl PositionEngine for E {
+            fn analyse(&mut self, p: &Chess, _: Color, n: Nodes) -> Result<Analysis, EngineError> {
+                if n.get() == 1_000_000 {
+                    self.deep_calls += 1;
+                }
+                let actual = self.actuals.iter().find(|(b, _)| b == p).map(|(_, m)| *m);
+                let mv = p
+                    .legal_moves()
+                    .into_iter()
+                    .find(|m| Some(*m) != actual)
+                    .unwrap();
+                let u = mv.to_uci(shakmaty::CastlingMode::Standard).to_string();
+                Ok(Analysis {
+                    evaluation: Evaluation::centipawns(if p.turn() == self.user {
+                        0
+                    } else {
+                        -300
+                    }),
+                    best_uci: u.clone(),
+                    final_best_uci: u.clone(),
+                    pv: vec![u],
+                })
+            }
+        }
+        let game = LocalPgnPolicy
+            .verify(
+                crate::pgn::parse_one(
+                    b"[Result \"1-0\"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. d3 d6 5. Nc3 Nf6 1-0",
+                )
+                .unwrap()
+                .unwrap(),
+            )
+            .unwrap();
+        let mut p = game.initial_position().clone();
+        let mut actuals = vec![];
+        for u in game.moves() {
+            let m = u.to_move(&p).unwrap();
+            actuals.push((p.clone(), m));
+            p.play_unchecked(m);
+        }
+        for user in [Color::White, Color::Black] {
+            let mut e = E {
+                user,
+                actuals: actuals.clone(),
+                deep_calls: 0,
+            };
+            let c = candidates(&game, user, &mut e, AnalysisConfig::default()).unwrap();
+            assert_eq!(c.len(), 3);
+            assert_eq!(e.deep_calls, 10);
+        }
     }
 }

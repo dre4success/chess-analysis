@@ -47,21 +47,39 @@ pub fn open(
     for (name, value) in [("Threads", "1"), ("Hash", "64"), ("MultiPV", "1")] {
         uci_options.insert(name.into(), value.into());
     }
-    let nnue_identity = uci_options
+    let mut nnue_identity = uci_options
         .iter()
         .filter(|(k, _)| k.starts_with("EvalFile"))
         .map(|(k, v)| format!("{k}={v}"))
         .collect::<Vec<_>>()
         .join("; ");
+    for (_, filename) in uci_options
+        .iter()
+        .filter(|(k, _)| k.starts_with("EvalFile"))
+    {
+        for candidate in [
+            std::env::current_dir()?.join(filename),
+            path.parent().unwrap_or(Path::new(".")).join(filename),
+        ] {
+            if candidate.is_file() {
+                nnue_identity.push_str(&format!(
+                    "; external candidate {} sha256={}",
+                    candidate.display(),
+                    file_sha256(&candidate)?
+                ));
+            }
+        }
+    }
     // Stockfish embeds the default nets in the executable. Its digest pins their
     // bytes; filenames additionally record the engine-reported network identity.
     let metadata = EngineMetadata {
-        name: "Stockfish".into(),
+        name: engine.name.split_whitespace().next().unwrap_or("unknown").into(),
         version: engine.name.clone(),
         executable_sha256,
         nnue_sha256: None,
         nnue_identity,
         uci_options,
+        threshold_cp: 200,
         scan_nodes: scan.get(),
         deep_nodes: deep.get(),
         threads: 1,
@@ -69,7 +87,7 @@ pub fn open(
         multipv: 1,
         clear_hash_between_positions: true,
         analysis_order:
-            "game-order; scan before/after; confirm before/after; clear hash each position".into(),
+            "game-order; scan before/after; confirm before/after; clear hash each position; last exact-score PV; never flag final UCI bestmove".into(),
         platform: std::env::consts::OS.into(),
         architecture: std::env::consts::ARCH.into(),
     };

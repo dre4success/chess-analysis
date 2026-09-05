@@ -1,0 +1,1662 @@
+{
+  "schema_version": "1.0",
+  "user": "dre4success007",
+  "generated": "2026-09-05T14:32:42.120370+00:00",
+  "mode": "verified",
+  "engine": {
+    "name": "Stockfish",
+    "version": "Stockfish 18",
+    "executable_sha256": "ae4c93fa9676ca7750d0714342fd8a5b1d018000fc6e0f6cedf112067b5ef374",
+    "nnue_sha256": null,
+    "nnue_identity": "EvalFile=nn-c288c895ea92.nnue; EvalFileSmall=nn-37f18f62d772.nnue",
+    "uci_options": {
+      "Clear Hash": "",
+      "Debug Log File": "<empty>",
+      "EvalFile": "nn-c288c895ea92.nnue",
+      "EvalFileSmall": "nn-37f18f62d772.nnue",
+      "Hash": "64",
+      "Move Overhead": "10",
+      "MultiPV": "1",
+      "NumaPolicy": "auto",
+      "Ponder": "false",
+      "Skill Level": "20",
+      "Syzygy50MoveRule": "true",
+      "SyzygyPath": "<empty>",
+      "SyzygyProbeDepth": "1",
+      "SyzygyProbeLimit": "7",
+      "Threads": "1",
+      "UCI_Chess960": "false",
+      "UCI_Elo": "1320",
+      "UCI_LimitStrength": "false",
+      "UCI_ShowWDL": "false",
+      "nodestime": "0"
+    },
+    "threshold_cp": 200,
+    "scan_nodes": 150000,
+    "deep_nodes": 1000000,
+    "threads": 1,
+    "hash_mb": 64,
+    "multipv": 1,
+    "clear_hash_between_positions": true,
+    "analysis_order": "game-order; scan before/after; confirm before/after; clear hash each position; last exact-score PV; never flag final UCI bestmove",
+    "platform": "macos",
+    "architecture": "aarch64"
+  },
+  "games": [
+    {
+      "url": "https://www.chess.com/game/live/173928199510",
+      "input_pgn_sha256": "be03e9bb7338e712732c4271d3c995329bf80fe6bc89bc8fed140aa6b93d8b46",
+      "date": "2026.09.03",
+      "colour": "white",
+      "result": "win",
+      "opponent": {
+        "name": "mhelteo",
+        "rating": 916
+      },
+      "time_control": "600",
+      "clock_used_pct": 27.966666666666665,
+      "eco": "A50",
+      "findings": [
+        {
+          "ply": 61,
+          "before_fen": "8/1pqbk1p1/p1p1p2p/P1PpP1P1/1P1P3P/5QP1/6B1/6K1 w - - 2 31",
+          "after_fen": "8/1pqbk1p1/p1p1p1Pp/P1PpP3/1P1P3P/5QP1/6B1/6K1 b - - 0 31",
+          "actual_uci": "g5g6",
+          "actual_san": "g6",
+          "best_uci": "g5h6",
+          "best_san": "gxh6",
+          "eval_before": {
+            "type": "cp",
+            "value": 1205,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": 390,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "g5h6",
+            "c7d8",
+            "h6g7",
+            "d7c8",
+            "f3f6",
+            "e7d7",
+            "f6f7",
+            "d8e7",
+            "f7e7",
+            "d7e7",
+            "g7g8q",
+            "c8d7",
+            "g1h2",
+            "d7c8",
+            "g8c8",
+            "e7f7",
+            "c8d7",
+            "f7f8",
+            "d7e6",
+            "b7b6",
+            "a5b6",
+            "a6a5",
+            "b6b7",
+            "a5a4",
+            "e6f6",
+            "f8e8",
+            "b7b8q",
+            "e8d7"
+          ],
+          "confidence": "verified",
+          "clock_secs": 473.2
+        }
+      ],
+      "phase_coverage": [
+        "late (plies 61+)",
+        "middle (plies 21–60)",
+        "opening (plies 1–20)"
+      ],
+      "clock_band_coverage": [
+        "120s+"
+      ]
+    },
+    {
+      "url": "https://www.chess.com/game/live/173951625678",
+      "input_pgn_sha256": "1176040e3be3f27c1fb5bbaaf4f6a5f66e5e9a5a366a1f654aa8554147ae8db4",
+      "date": "2026.09.03",
+      "colour": "black",
+      "result": "win",
+      "opponent": {
+        "name": "katrina37",
+        "rating": 1076
+      },
+      "time_control": "600",
+      "clock_used_pct": 57.35,
+      "eco": "B10",
+      "findings": [],
+      "phase_coverage": [
+        "late (plies 61+)",
+        "middle (plies 21–60)",
+        "opening (plies 1–20)"
+      ],
+      "clock_band_coverage": [
+        "120s+"
+      ]
+    },
+    {
+      "url": "https://www.chess.com/game/live/173956430012",
+      "input_pgn_sha256": "99978b1dba5c8cd7e3f417884c803d31b345f1082db2e1205d0068dc30f14737",
+      "date": "2026.09.03",
+      "colour": "black",
+      "result": "win",
+      "opponent": {
+        "name": "JatinSaroha",
+        "rating": 1072
+      },
+      "time_control": "600",
+      "clock_used_pct": 37.93333333333334,
+      "eco": "B13",
+      "findings": [
+        {
+          "ply": 28,
+          "before_fen": "rq2r3/pp1k1ppp/4p3/1N1pPb2/8/P6P/1PP2PP1/R2QK2R b KQ - 0 14",
+          "after_fen": "rq2r3/pp2kppp/4p3/1N1pPb2/8/P6P/1PP2PP1/R2QK2R w KQ - 1 15",
+          "actual_uci": "d7e7",
+          "actual_san": "Ke7",
+          "best_uci": "b8e5",
+          "best_san": "Qxe5+",
+          "eval_before": {
+            "type": "cp",
+            "value": 279,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -132,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "b8e5",
+            "e1f1",
+            "e5b2",
+            "b5d4",
+            "f5d3",
+            "c2d3",
+            "b2d4",
+            "g2g3",
+            "b7b6",
+            "f1g2",
+            "a8c8",
+            "h3h4",
+            "d7e7",
+            "a1c1",
+            "d4b2",
+            "c1b1",
+            "b2c2",
+            "d1f3",
+            "e7f8",
+            "g2h2"
+          ],
+          "confidence": "verified",
+          "clock_secs": 524.6
+        },
+        {
+          "ply": 52,
+          "before_fen": "8/pp2kppp/8/3p1p2/3RrP2/P1P4P/1P4P1/5K2 b - - 0 26",
+          "after_fen": "8/pp2kppp/8/3p1p2/3r1P2/P1P4P/1P4P1/5K2 w - - 0 27",
+          "actual_uci": "e4d4",
+          "actual_san": "Rxd4",
+          "best_uci": "e7d6",
+          "best_san": "Kd6",
+          "eval_before": {
+            "type": "cp",
+            "value": 277,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": 69,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "e7d6",
+            "g2g3",
+            "a7a5",
+            "d4d2",
+            "a5a4",
+            "f1f2",
+            "d6c5",
+            "f2f3",
+            "h7h6",
+            "d2g2",
+            "c5c4",
+            "g3g4",
+            "f5g4",
+            "h3g4",
+            "c4d3",
+            "g4g5",
+            "e4e3",
+            "f3g4",
+            "e3e2",
+            "g2g3",
+            "d3e4"
+          ],
+          "confidence": "verified",
+          "clock_secs": 474.5
+        },
+        {
+          "ply": 82,
+          "before_fen": "8/5p2/6Pk/1p1p4/1P1P2K1/8/8/8 b - - 0 41",
+          "after_fen": "8/8/6pk/1p1p4/1P1P2K1/8/8/8 w - - 0 42",
+          "actual_uci": "f7g6",
+          "actual_san": "fxg6",
+          "best_uci": "h6g6",
+          "best_san": "Kxg6",
+          "eval_before": {
+            "type": "cp",
+            "value": 710,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": 462,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "h6g6",
+            "g4f4",
+            "f7f6",
+            "f4g4",
+            "f6f5",
+            "g4f4",
+            "g6f6",
+            "f4f3",
+            "f6g5",
+            "f3g3",
+            "f5f4",
+            "g3f3",
+            "g5f5",
+            "f3e2",
+            "f5g4",
+            "e2e1"
+          ],
+          "confidence": "verified",
+          "clock_secs": 421.0
+        }
+      ],
+      "phase_coverage": [
+        "late (plies 61+)",
+        "middle (plies 21–60)",
+        "opening (plies 1–20)"
+      ],
+      "clock_band_coverage": [
+        "120s+"
+      ]
+    },
+    {
+      "url": "https://www.chess.com/game/live/173984600836",
+      "input_pgn_sha256": "7e9c987d8b0e01f0e7474c88051f0ee2bab35d82cad0f4fe688473c1bc52a972",
+      "date": "2026.09.04",
+      "colour": "black",
+      "result": "loss",
+      "opponent": {
+        "name": "Priyam714",
+        "rating": 1222
+      },
+      "time_control": "600",
+      "clock_used_pct": 91.51666666666665,
+      "eco": "B12",
+      "findings": [
+        {
+          "ply": 54,
+          "before_fen": "3b1rk1/QR4p1/2p2qnp/2Pp4/3P1p2/2P2N1P/5PPB/6K1 b - - 2 27",
+          "after_fen": "3b1rk1/QR4p1/2p2q1p/2Pp4/3P1p1n/2P2N1P/5PPB/6K1 w - - 3 28",
+          "actual_uci": "g6h4",
+          "actual_san": "Nh4",
+          "best_uci": "f8f7",
+          "best_san": "Rf7",
+          "eval_before": {
+            "type": "cp",
+            "value": -124,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -429,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "f8f7",
+            "b7f7",
+            "f6f7",
+            "a7a8",
+            "f7c7",
+            "g1f1",
+            "g8h7",
+            "f3e1",
+            "c7d7",
+            "a8b8",
+            "d8g5",
+            "h3h4",
+            "g5h4",
+            "h2f4",
+            "d7f5",
+            "f4g3",
+            "f5e4",
+            "g3h4",
+            "g6h4",
+            "b8b2",
+            "h4f5",
+            "b2e2",
+            "e4f4",
+            "e2f3"
+          ],
+          "confidence": "verified",
+          "clock_secs": 368.0
+        },
+        {
+          "ply": 72,
+          "before_fen": "8/6pk/2Q4p/2PR2q1/3b4/2r3BP/5PK1/8 b - - 0 36",
+          "after_fen": "8/6pk/2Q4p/2PR4/3b4/2r3BP/3q1PK1/8 w - - 1 37",
+          "actual_uci": "g5d2",
+          "actual_san": "Qd2",
+          "best_uci": "c3g3",
+          "best_san": "Rxg3+",
+          "eval_before": {
+            "type": "mate",
+            "winner": "user",
+            "moves": 8,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -242,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "c3g3",
+            "f2g3",
+            "g5d2",
+            "g2f3",
+            "d2e3",
+            "f3g4",
+            "e3e4",
+            "g4h5",
+            "g7g6",
+            "c6g6",
+            "e4g6",
+            "h5h4",
+            "d4f6",
+            "d5g5",
+            "g6g5"
+          ],
+          "confidence": "verified",
+          "clock_secs": 156.2
+        },
+        {
+          "ply": 76,
+          "before_fen": "8/6pk/4Q2p/2PR4/3b4/6KP/3q1P2/8 b - - 0 38",
+          "after_fen": "8/6pk/4Q2p/2PR4/3b4/3q2KP/5P2/8 w - - 1 39",
+          "actual_uci": "d2d3",
+          "actual_san": "Qd3+",
+          "best_uci": "d2f2",
+          "best_san": "Qxf2+",
+          "eval_before": {
+            "type": "mate",
+            "winner": "user",
+            "moves": 13,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -620,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "d2f2",
+            "g3g4",
+            "f2g2",
+            "g4f4",
+            "g7g5",
+            "d5g5",
+            "h6g5",
+            "f4f5",
+            "g2h3",
+            "f5e4",
+            "h3e6",
+            "e4d4",
+            "g5g4",
+            "c5c6",
+            "g4g3",
+            "c6c7",
+            "g3g2",
+            "d4c3",
+            "g2g1q",
+            "c7c8n",
+            "g1e3",
+            "c3b4",
+            "e6c6",
+            "b4a5",
+            "e3a3"
+          ],
+          "confidence": "verified",
+          "clock_secs": 77.7
+        }
+      ],
+      "phase_coverage": [
+        "late (plies 61+)",
+        "middle (plies 21–60)",
+        "opening (plies 1–20)"
+      ],
+      "clock_band_coverage": [
+        "120s+",
+        "30–119s"
+      ]
+    },
+    {
+      "url": "https://www.chess.com/game/live/173985589442",
+      "input_pgn_sha256": "45da7b48e27119abd3930dfa010a6b12d0cf4368d6d3659b0ce46502ee52d19f",
+      "date": "2026.09.04",
+      "colour": "white",
+      "result": "win",
+      "opponent": {
+        "name": "Menang_Bae",
+        "rating": 964
+      },
+      "time_control": "600",
+      "clock_used_pct": 16.449999999999996,
+      "eco": "D20",
+      "findings": [],
+      "phase_coverage": [
+        "middle (plies 21–60)",
+        "opening (plies 1–20)"
+      ],
+      "clock_band_coverage": [
+        "120s+"
+      ]
+    },
+    {
+      "url": "https://www.chess.com/game/live/173992359850",
+      "input_pgn_sha256": "89b2ff3c81d842f04525fd8a76b5dc07ca2f92596ab7524c106c2fada301125d",
+      "date": "2026.09.04",
+      "colour": "white",
+      "result": "win",
+      "opponent": {
+        "name": "geo410",
+        "rating": 1128
+      },
+      "time_control": "600",
+      "clock_used_pct": 47.39999999999999,
+      "eco": "D10",
+      "findings": [
+        {
+          "ply": 29,
+          "before_fen": "r6r/pp1k1ppp/4p3/3p1b2/4nQ2/P3B1P1/1q2PPBP/R4RK1 w - - 0 15",
+          "after_fen": "r6r/pp1k1ppp/4p3/3p1b2/4nQ2/P3B1P1/1q2PPBP/R1R3K1 b - - 1 15",
+          "actual_uci": "f1c1",
+          "actual_san": "Rfc1",
+          "best_uci": "a1b1",
+          "best_san": "Rab1",
+          "eval_before": {
+            "type": "cp",
+            "value": 436,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": 73,
+            "pov": "user"
+          },
+          "classification": "attacked-piece-ignored",
+          "explanation": "The opponent's last move attacked your piece on e2; your reply left a profitable capture available there.",
+          "principal_variation_uci": [
+            "a1b1",
+            "g7g5",
+            "f4f5",
+            "e6f5",
+            "b1b2",
+            "f7f6",
+            "b2b7",
+            "d7e6",
+            "b7c7",
+            "a8c8",
+            "f1c1",
+            "c8c7",
+            "c1c7",
+            "e4d6",
+            "c7c1",
+            "h7h5",
+            "c1c6",
+            "d5d4",
+            "e3d4"
+          ],
+          "confidence": "verified",
+          "clock_secs": 376.1
+        },
+        {
+          "ply": 31,
+          "before_fen": "2r4r/pp1k1ppp/4p3/3p1b2/4nQ2/P3B1P1/1q2PPBP/R1R3K1 w - - 2 16",
+          "after_fen": "2r4r/pp1k1ppp/4p3/3p1b2/4nQ2/P3B1P1/1q2PPBP/1RR3K1 b - - 3 16",
+          "actual_uci": "a1b1",
+          "actual_san": "Rab1",
+          "best_uci": "c1b1",
+          "best_san": "Rcb1",
+          "eval_before": {
+            "type": "cp",
+            "value": 199,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -197,
+            "pov": "user"
+          },
+          "classification": "defender-left",
+          "explanation": "Moving from a1 removed the only geometric defender of your piece on a3; the opponent can now win material there.",
+          "principal_variation_uci": [
+            "c1b1",
+            "g7g5",
+            "f4e4",
+            "b2b1",
+            "e4b1",
+            "f5b1",
+            "a1b1",
+            "b7b6",
+            "e3g5",
+            "h8g8",
+            "g5f4",
+            "c8c4",
+            "e2e4",
+            "d5e4",
+            "g2f1",
+            "c4c2",
+            "f1b5",
+            "d7e7",
+            "b1d1",
+            "e7f6",
+            "d1d7",
+            "g8a8",
+            "f4e3",
+            "a7a6",
+            "b5a4",
+            "c2c4",
+            "a4d1"
+          ],
+          "confidence": "verified",
+          "clock_secs": 336.5
+        }
+      ],
+      "phase_coverage": [
+        "middle (plies 21–60)",
+        "opening (plies 1–20)"
+      ],
+      "clock_band_coverage": [
+        "120s+"
+      ]
+    },
+    {
+      "url": "https://www.chess.com/game/live/174006168670",
+      "input_pgn_sha256": "64319eace8282485898e6f88a0d9c8250e7913e1e0869765a81d73eca14d6a4c",
+      "date": "2026.09.04",
+      "colour": "white",
+      "result": "win",
+      "opponent": {
+        "name": "nebula_aaa",
+        "rating": 1044
+      },
+      "time_control": "600",
+      "clock_used_pct": 59.966666666666654,
+      "eco": "E06",
+      "findings": [
+        {
+          "ply": 23,
+          "before_fen": "rn1q1rk1/pb2bpp1/1p2pn1p/1P6/2Np4/P4NP1/4PPBP/R1BQ1RK1 w - - 0 12",
+          "after_fen": "rn1q1rk1/pb2bpp1/1p2pn1p/1P6/2NN4/P5P1/4PPBP/R1BQ1RK1 b - - 0 12",
+          "actual_uci": "f3d4",
+          "actual_san": "Nxd4",
+          "best_uci": "d1d4",
+          "best_san": "Qxd4",
+          "eval_before": {
+            "type": "cp",
+            "value": -5,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -335,
+            "pov": "user"
+          },
+          "classification": "line-opened",
+          "explanation": "Moving from f3 opened the b7–g2 line onto your bishop on g2.",
+          "principal_variation_uci": [
+            "d1d4",
+            "b8d7",
+            "c1b2",
+            "a7a6",
+            "a3a4",
+            "d8c7",
+            "f1c1",
+            "a6b5",
+            "a4b5",
+            "a8a1",
+            "b2a1",
+            "b7d5",
+            "d4c3",
+            "c7b7",
+            "c4e3",
+            "d5e4",
+            "f3d4",
+            "e4g2",
+            "e3g2",
+            "e7c5",
+            "g2e3",
+            "b7e4",
+            "d4b3",
+            "f8a8",
+            "b3c5",
+            "d7c5"
+          ],
+          "confidence": "verified",
+          "clock_secs": 530.2
+        },
+        {
+          "ply": 39,
+          "before_fen": "1r1r2k1/pQ3pp1/1p2p2p/1Pb4q/2N2Bn1/P3PNP1/5P1P/R4RK1 w - - 3 20",
+          "after_fen": "1r1r2k1/Q4pp1/1p2p2p/1Pb4q/2N2Bn1/P3PNP1/5P1P/R4RK1 b - - 0 20",
+          "actual_uci": "b7a7",
+          "actual_san": "Qxa7",
+          "best_uci": "f4b8",
+          "best_san": "Bxb8",
+          "eval_before": {
+            "type": "cp",
+            "value": 596,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": 332,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "f4b8",
+            "d8d5",
+            "c4e5",
+            "f7f6",
+            "b7c8",
+            "g8h7",
+            "e5g4",
+            "h5g4",
+            "f3d4",
+            "c5d4",
+            "e3d4",
+            "g4h3",
+            "c8c2",
+            "g7g6",
+            "f2f3",
+            "e6e5",
+            "f1f2",
+            "d5d4"
+          ],
+          "confidence": "verified",
+          "clock_secs": 385.1
+        }
+      ],
+      "phase_coverage": [
+        "middle (plies 21–60)",
+        "opening (plies 1–20)"
+      ],
+      "clock_band_coverage": [
+        "120s+"
+      ]
+    },
+    {
+      "url": "https://www.chess.com/game/live/174029949782",
+      "input_pgn_sha256": "ab6277feb54a4be7e5d5f7a1df66d298f4d6f65b9e2b261ac11227e5474c567e",
+      "date": "2026.09.05",
+      "colour": "white",
+      "result": "loss",
+      "opponent": {
+        "name": "nik75alex",
+        "rating": 1055
+      },
+      "time_control": "600",
+      "clock_used_pct": 33.666666666666664,
+      "eco": "A43",
+      "findings": [
+        {
+          "ply": 25,
+          "before_fen": "r1b2rk1/pp1p1ppp/2n2n2/8/2PNp3/4P1P1/Pq1B2BP/R2Q1R1K w - - 0 13",
+          "after_fen": "r1b2rk1/pp1p1ppp/2N2n2/8/2P1p3/4P1P1/Pq1B2BP/R2Q1R1K b - - 0 13",
+          "actual_uci": "d4c6",
+          "actual_san": "Nxc6",
+          "best_uci": "d4b5",
+          "best_san": "Nb5",
+          "eval_before": {
+            "type": "cp",
+            "value": 198,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -155,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "d4b5",
+            "f6g4",
+            "h2h3",
+            "c6e5",
+            "a1b1",
+            "b2a2",
+            "b5d6",
+            "e5c4",
+            "d6c4",
+            "a2c4",
+            "d1g4",
+            "d7d6",
+            "g4f4",
+            "a7a5",
+            "g2e4",
+            "c8e6",
+            "f1c1",
+            "c4e2",
+            "d2c3",
+            "a8c8",
+            "e4g2",
+            "c8c4",
+            "g2f1",
+            "c4f4",
+            "f1e2",
+            "f4f2",
+            "e2f1"
+          ],
+          "confidence": "verified",
+          "clock_secs": 540.6
+        },
+        {
+          "ply": 33,
+          "before_fen": "1r3rk1/p2p1ppp/b1p2n2/8/P1P1p3/2B1P1P1/4q1BP/R3QR1K w - - 5 17",
+          "after_fen": "1r3rk1/p2p1ppp/b1p2B2/8/P1P1p3/4P1P1/4q1BP/R3QR1K b - - 0 17",
+          "actual_uci": "c3f6",
+          "actual_san": "Bxf6",
+          "best_uci": "e1e2",
+          "best_san": "Qxe2",
+          "eval_before": {
+            "type": "cp",
+            "value": 606,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -206,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "e1e2",
+            "f6d5",
+            "c3g7",
+            "g8g7",
+            "e2g4",
+            "g7h8",
+            "g4f5",
+            "d5e3",
+            "f5f6",
+            "h8g8",
+            "f6g5",
+            "g8h8",
+            "g5e3",
+            "d7d5",
+            "h2h4",
+            "f7f6",
+            "e3a7",
+            "e4e3",
+            "f1e1",
+            "e3e2",
+            "h1h2",
+            "a6c4"
+          ],
+          "confidence": "verified",
+          "clock_secs": 480.5
+        },
+        {
+          "ply": 37,
+          "before_fen": "1r3rk1/p2p1ppp/2p2B2/8/P1b1p3/4P1P1/6BP/4RR1K w - - 0 19",
+          "after_fen": "1r3rk1/p2p1ppp/2p2B2/8/P1b1p3/4P1P1/5RBP/4R2K b - - 1 19",
+          "actual_uci": "f1f2",
+          "actual_san": "Rf2",
+          "best_uci": "f6e5",
+          "best_san": "Be5",
+          "eval_before": {
+            "type": "cp",
+            "value": 0,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -307,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "f6e5",
+            "c4f1",
+            "g2f1",
+            "b8b3",
+            "a4a5",
+            "f8c8",
+            "a5a6",
+            "b3b6",
+            "e1d1",
+            "d7d5",
+            "d1c1",
+            "c6c5",
+            "e5d4",
+            "b6c6",
+            "f1b5",
+            "c6b6",
+            "b5e2",
+            "b6c6"
+          ],
+          "confidence": "verified",
+          "clock_secs": 455.9
+        }
+      ],
+      "phase_coverage": [
+        "late (plies 61+)",
+        "middle (plies 21–60)",
+        "opening (plies 1–20)"
+      ],
+      "clock_band_coverage": [
+        "120s+"
+      ]
+    },
+    {
+      "url": "https://www.chess.com/game/live/174030233138",
+      "input_pgn_sha256": "d6a2ab98f98b30eb873544ca964b349fe93fbff7a4fd666965370a8edd1cbf01",
+      "date": "2026.09.05",
+      "colour": "black",
+      "result": "loss",
+      "opponent": {
+        "name": "mdndpower",
+        "rating": 957
+      },
+      "time_control": "600",
+      "clock_used_pct": 58.0,
+      "eco": "A01",
+      "findings": [
+        {
+          "ply": 32,
+          "before_fen": "r1bq1rk1/1pp3pp/5p2/p1b2n2/P1Np4/BP1P2P1/4PPBP/R2Q1RK1 b - - 5 16",
+          "after_fen": "r1bq1rk1/2p3pp/1p3p2/p1b2n2/P1Np4/BP1P2P1/4PPBP/R2Q1RK1 w - - 0 17",
+          "actual_uci": "b7b6",
+          "actual_san": "b6",
+          "best_uci": "c5a3",
+          "best_san": "Bxa3",
+          "eval_before": {
+            "type": "cp",
+            "value": -55,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -474,
+            "pov": "user"
+          },
+          "classification": "line-opened",
+          "explanation": "Moving from b7 opened the g2–a8 line onto your rook on a8.",
+          "principal_variation_uci": [
+            "c5a3",
+            "c4a3",
+            "f8e8",
+            "d1d2",
+            "c7c6",
+            "f1c1",
+            "f5d6",
+            "a1b1",
+            "h7h5",
+            "a3c2",
+            "d6f7",
+            "c1e1",
+            "f7g5",
+            "h2h4",
+            "g5h3",
+            "g1f1",
+            "g7g5",
+            "b3b4",
+            "g5h4",
+            "d2h6",
+            "h4g3",
+            "h6g6",
+            "g8f8",
+            "g6g3",
+            "h3g5"
+          ],
+          "confidence": "verified",
+          "clock_secs": 493.8
+        },
+        {
+          "ply": 34,
+          "before_fen": "r1bq1rk1/2p3pp/1p3p2/p1b2n2/P1Np4/BP1P2P1/3QPPBP/R4RK1 b - - 1 17",
+          "after_fen": "1rbq1rk1/2p3pp/1p3p2/p1b2n2/P1Np4/BP1P2P1/3QPPBP/R4RK1 w - - 2 18",
+          "actual_uci": "a8b8",
+          "actual_san": "Rb8",
+          "best_uci": "c5a3",
+          "best_san": "Bxa3",
+          "eval_before": {
+            "type": "cp",
+            "value": -83,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -340,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "c5a3",
+            "c4a3",
+            "a8a6",
+            "a3b5",
+            "c7c5",
+            "d2f4",
+            "g8h8",
+            "f1e1",
+            "g7g5",
+            "f4c7",
+            "h7h5",
+            "c7d8",
+            "f8d8",
+            "e2e4",
+            "d4e3",
+            "f2e3",
+            "h5h4",
+            "d3d4",
+            "h4g3",
+            "h2g3",
+            "c5d4",
+            "e3d4",
+            "c8d7",
+            "g2e4",
+            "f5g3"
+          ],
+          "confidence": "verified",
+          "clock_secs": 487.9
+        }
+      ],
+      "phase_coverage": [
+        "middle (plies 21–60)",
+        "opening (plies 1–20)"
+      ],
+      "clock_band_coverage": [
+        "120s+"
+      ]
+    },
+    {
+      "url": "https://www.chess.com/game/live/174030627562",
+      "input_pgn_sha256": "aac4b5b0d127fa715907daf738d96308ba07fdd60227c06090cfbeb058321969",
+      "date": "2026.09.05",
+      "colour": "black",
+      "result": "loss",
+      "opponent": {
+        "name": "zakmar123",
+        "rating": 856
+      },
+      "time_control": "600",
+      "clock_used_pct": 14.583333333333334,
+      "eco": "B10",
+      "findings": [
+        {
+          "ply": 20,
+          "before_fen": "rn1qk2r/pp2bppp/2p1p3/3pPbN1/3P1BnP/2N5/PPP1BPP1/R2QK2R b KQkq - 2 10",
+          "after_fen": "rn1q1rk1/pp2bppp/2p1p3/3pPbN1/3P1BnP/2N5/PPP1BPP1/R2QK2R w KQ - 3 11",
+          "actual_uci": "e8g8",
+          "actual_san": "O-O",
+          "best_uci": "h7h5",
+          "best_san": "h5",
+          "eval_before": {
+            "type": "cp",
+            "value": -10,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -434,
+            "pov": "user"
+          },
+          "classification": "attacked-piece-ignored",
+          "explanation": "The opponent's last move attacked your piece on g4; your reply left a profitable capture available there.",
+          "principal_variation_uci": [
+            "h7h5",
+            "f2f3",
+            "g4h6",
+            "a2a3",
+            "b8d7",
+            "g2g4",
+            "f5g6",
+            "d1d2",
+            "a7a5",
+            "f4e3",
+            "b7b5",
+            "g4h5",
+            "g6f5",
+            "h1g1",
+            "d8b6",
+            "c3d1",
+            "c6c5",
+            "c2c3",
+            "f7f6"
+          ],
+          "confidence": "verified",
+          "clock_secs": 542.8
+        },
+        {
+          "ply": 24,
+          "before_fen": "rn1q1rk1/pp2bppp/2p1p3/3pP1N1/3P1BQP/2N5/PPP2PP1/R3K2R b KQ - 0 12",
+          "after_fen": "rn1q1rk1/pp2b1pp/2p1pp2/3pP1N1/3P1BQP/2N5/PPP2PP1/R3K2R w KQ - 0 13",
+          "actual_uci": "f7f6",
+          "actual_san": "f6",
+          "best_uci": "c6c5",
+          "best_san": "c5",
+          "eval_before": {
+            "type": "cp",
+            "value": -436,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -805,
+            "pov": "user"
+          },
+          "classification": "defender-left",
+          "explanation": "Moving from f7 removed the only geometric defender of your piece on e6; the opponent can now win material there.",
+          "principal_variation_uci": [
+            "c6c5",
+            "g5f3",
+            "f7f5",
+            "e5f6",
+            "e7f6",
+            "e1g1",
+            "b8c6",
+            "f4g3",
+            "d8c8",
+            "c3e2",
+            "h7h5",
+            "g4h3",
+            "c6d4"
+          ],
+          "confidence": "verified",
+          "clock_secs": 537.1
+        },
+        {
+          "ply": 26,
+          "before_fen": "rn1q1rk1/pp2b1pp/2p1Np2/3pP3/3P1BQP/2N5/PPP2PP1/R3K2R b KQ - 0 13",
+          "after_fen": "rn2qrk1/pp2b1pp/2p1Np2/3pP3/3P1BQP/2N5/PPP2PP1/R3K2R w KQ - 1 14",
+          "actual_uci": "d8e8",
+          "actual_san": "Qe8",
+          "best_uci": "f8f7",
+          "best_san": "Rf7",
+          "eval_before": {
+            "type": "cp",
+            "value": -805,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "mate",
+            "winner": "opponent",
+            "moves": 1,
+            "pov": "user"
+          },
+          "classification": "attacked-piece-ignored",
+          "explanation": "The opponent's last move attacked your piece on g7; your reply left a profitable capture available there.",
+          "principal_variation_uci": [
+            "f8f7",
+            "e6d8",
+            "e7d8",
+            "e5e6",
+            "f7e7",
+            "e1g1",
+            "b8a6",
+            "f4d6",
+            "a6c7",
+            "d6e7",
+            "d8e7",
+            "g4f5",
+            "a8e8",
+            "g1h1",
+            "e7d6",
+            "a1e1",
+            "e8e6",
+            "e1e6",
+            "g8f7",
+            "e6d6"
+          ],
+          "confidence": "verified",
+          "clock_secs": 512.5
+        }
+      ],
+      "phase_coverage": [
+        "middle (plies 21–60)",
+        "opening (plies 1–20)"
+      ],
+      "clock_band_coverage": [
+        "120s+"
+      ]
+    },
+    {
+      "url": "https://www.chess.com/game/live/174030760406",
+      "input_pgn_sha256": "a1218fb362ff9cde7f51dd0950c61c7933dd2ca61e599e1d7adef14215953b15",
+      "date": "2026.09.05",
+      "colour": "white",
+      "result": "win",
+      "opponent": {
+        "name": "Vallerymarv",
+        "rating": 1167
+      },
+      "time_control": "600",
+      "clock_used_pct": 3.5166666666666706,
+      "eco": "A40",
+      "findings": [],
+      "phase_coverage": [
+        "opening (plies 1–20)"
+      ],
+      "clock_band_coverage": [
+        "120s+"
+      ]
+    },
+    {
+      "url": "https://www.chess.com/game/live/174030838442",
+      "input_pgn_sha256": "d817b1dbafb31494de67341d5a22bbb65b7dce1a68c86cd9f04554ad53cbb574",
+      "date": "2026.09.05",
+      "colour": "white",
+      "result": "loss",
+      "opponent": {
+        "name": "NONYAT96",
+        "rating": 1029
+      },
+      "time_control": "600",
+      "clock_used_pct": 61.08333333333332,
+      "eco": "A43",
+      "findings": [
+        {
+          "ply": 45,
+          "before_fen": "2B2b1r/p3pppp/8/2k5/2N5/2p1P1P1/P1K4P/B5Nn w - - 0 23",
+          "after_fen": "2B2b1r/p3pppp/8/2k5/2N5/2K1P1P1/P6P/B5Nn b - - 0 23",
+          "actual_uci": "c2c3",
+          "actual_san": "Kxc3",
+          "best_uci": "c4e5",
+          "best_san": "Ne5",
+          "eval_before": {
+            "type": "cp",
+            "value": 337,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": 7,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "c4e5",
+            "g7g5",
+            "a1c3",
+            "f8g7",
+            "c8b7",
+            "h1f2",
+            "c3d4",
+            "c5b5",
+            "c2b3",
+            "g7e5",
+            "a2a4",
+            "b5a5",
+            "d4e5",
+            "a5b6",
+            "e5h8",
+            "b6b7",
+            "h8c3",
+            "f7f6",
+            "c3d4",
+            "a7a6",
+            "h2h3"
+          ],
+          "confidence": "verified",
+          "clock_secs": 433.4
+        },
+        {
+          "ply": 47,
+          "before_fen": "2B2b1r/p4ppp/4p3/2k5/2N5/2K1P1P1/P6P/B5Nn w - - 0 24",
+          "after_fen": "2B2b1r/p4ppp/4p3/2k5/P1N5/2K1P1P1/7P/B5Nn b - - 0 24",
+          "actual_uci": "a2a4",
+          "actual_san": "a4",
+          "best_uci": "c3b3",
+          "best_san": "Kb3",
+          "eval_before": {
+            "type": "cp",
+            "value": 227,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -330,
+            "pov": "user"
+          },
+          "classification": "engine-verified-mistake",
+          "explanation": "The deeper engine search confirms an evaluation loss; the tactical mechanism is unclassified.",
+          "principal_variation_uci": [
+            "c3b3",
+            "f8e7",
+            "c8b7",
+            "e7f6",
+            "c4e5",
+            "f6e5",
+            "a1e5",
+            "h1f2",
+            "e5d4",
+            "c5d6",
+            "d4a7",
+            "f2d3",
+            "b3c4",
+            "d6c7",
+            "b7e4",
+            "d3f2",
+            "e4f3",
+            "h8c8",
+            "c4b3",
+            "c7d8"
+          ],
+          "confidence": "verified",
+          "clock_secs": 419.5
+        },
+        {
+          "ply": 83,
+          "before_fen": "8/p3k1r1/4pnpp/2N5/P1BK2PP/4P3/8/8 w - - 1 42",
+          "after_fen": "8/p3k1r1/4pnpp/8/P1BKN1PP/4P3/8/8 b - - 2 42",
+          "actual_uci": "c5e4",
+          "actual_san": "Ne4",
+          "best_uci": "c5e6",
+          "best_san": "Nxe6",
+          "eval_before": {
+            "type": "cp",
+            "value": -143,
+            "pov": "user"
+          },
+          "eval_after": {
+            "type": "cp",
+            "value": -448,
+            "pov": "user"
+          },
+          "classification": "attacked-piece-ignored",
+          "explanation": "The opponent's last move attacked your piece on g4; your reply left a profitable capture available there.",
+          "principal_variation_uci": [
+            "c5e6",
+            "g7h7",
+            "e6f4",
+            "g6g5",
+            "f4g6",
+            "e7e8",
+            "h4g5",
+            "h6g5",
+            "g6e5",
+            "e8f8",
+            "a4a5",
+            "h7h2",
+            "c4d3",
+            "h2g2",
+            "e5c6",
+            "g2g4",
+            "e3e4",
+            "g4g1",
+            "c6a7",
+            "g5g4",
+            "a7b5"
+          ],
+          "confidence": "verified",
+          "clock_secs": 296.4
+        }
+      ],
+      "phase_coverage": [
+        "late (plies 61+)",
+        "middle (plies 21–60)",
+        "opening (plies 1–20)"
+      ],
+      "clock_band_coverage": [
+        "120s+"
+      ]
+    }
+  ],
+  "patterns": [
+    {
+      "classification": "engine-verified-mistake",
+      "games_affected": 7,
+      "occurrences": 14,
+      "games_reviewed": 12,
+      "breakdowns": [
+        {
+          "dimension": "clock remaining",
+          "value": "120s+",
+          "games_affected": 7,
+          "games_reviewed": 12,
+          "occurrences": 13
+        },
+        {
+          "dimension": "clock remaining",
+          "value": "30–119s",
+          "games_affected": 1,
+          "games_reviewed": 1,
+          "occurrences": 1
+        },
+        {
+          "dimension": "colour",
+          "value": "black",
+          "games_affected": 3,
+          "games_reviewed": 5,
+          "occurrences": 7
+        },
+        {
+          "dimension": "colour",
+          "value": "white",
+          "games_affected": 4,
+          "games_reviewed": 7,
+          "occurrences": 7
+        },
+        {
+          "dimension": "eco",
+          "value": "A01",
+          "games_affected": 1,
+          "games_reviewed": 1,
+          "occurrences": 1
+        },
+        {
+          "dimension": "eco",
+          "value": "A43",
+          "games_affected": 2,
+          "games_reviewed": 2,
+          "occurrences": 5
+        },
+        {
+          "dimension": "eco",
+          "value": "A50",
+          "games_affected": 1,
+          "games_reviewed": 1,
+          "occurrences": 1
+        },
+        {
+          "dimension": "eco",
+          "value": "B12",
+          "games_affected": 1,
+          "games_reviewed": 1,
+          "occurrences": 3
+        },
+        {
+          "dimension": "eco",
+          "value": "B13",
+          "games_affected": 1,
+          "games_reviewed": 1,
+          "occurrences": 3
+        },
+        {
+          "dimension": "eco",
+          "value": "E06",
+          "games_affected": 1,
+          "games_reviewed": 1,
+          "occurrences": 1
+        },
+        {
+          "dimension": "phase",
+          "value": "late (plies 61+)",
+          "games_affected": 3,
+          "games_reviewed": 6,
+          "occurrences": 4
+        },
+        {
+          "dimension": "phase",
+          "value": "middle (plies 21–60)",
+          "games_affected": 6,
+          "games_reviewed": 11,
+          "occurrences": 10
+        }
+      ],
+      "example_refs": [
+        {
+          "url": "https://www.chess.com/game/live/173928199510",
+          "ply": 61
+        },
+        {
+          "url": "https://www.chess.com/game/live/173956430012",
+          "ply": 28
+        },
+        {
+          "url": "https://www.chess.com/game/live/173956430012",
+          "ply": 52
+        }
+      ]
+    },
+    {
+      "classification": "attacked-piece-ignored",
+      "games_affected": 3,
+      "occurrences": 4,
+      "games_reviewed": 12,
+      "breakdowns": [
+        {
+          "dimension": "clock remaining",
+          "value": "120s+",
+          "games_affected": 3,
+          "games_reviewed": 12,
+          "occurrences": 4
+        },
+        {
+          "dimension": "colour",
+          "value": "black",
+          "games_affected": 1,
+          "games_reviewed": 5,
+          "occurrences": 2
+        },
+        {
+          "dimension": "colour",
+          "value": "white",
+          "games_affected": 2,
+          "games_reviewed": 7,
+          "occurrences": 2
+        },
+        {
+          "dimension": "eco",
+          "value": "A43",
+          "games_affected": 1,
+          "games_reviewed": 2,
+          "occurrences": 1
+        },
+        {
+          "dimension": "eco",
+          "value": "B10",
+          "games_affected": 1,
+          "games_reviewed": 2,
+          "occurrences": 2
+        },
+        {
+          "dimension": "eco",
+          "value": "D10",
+          "games_affected": 1,
+          "games_reviewed": 1,
+          "occurrences": 1
+        },
+        {
+          "dimension": "phase",
+          "value": "late (plies 61+)",
+          "games_affected": 1,
+          "games_reviewed": 6,
+          "occurrences": 1
+        },
+        {
+          "dimension": "phase",
+          "value": "middle (plies 21–60)",
+          "games_affected": 2,
+          "games_reviewed": 11,
+          "occurrences": 2
+        },
+        {
+          "dimension": "phase",
+          "value": "opening (plies 1–20)",
+          "games_affected": 1,
+          "games_reviewed": 12,
+          "occurrences": 1
+        }
+      ],
+      "example_refs": [
+        {
+          "url": "https://www.chess.com/game/live/173992359850",
+          "ply": 29
+        },
+        {
+          "url": "https://www.chess.com/game/live/174030627562",
+          "ply": 20
+        },
+        {
+          "url": "https://www.chess.com/game/live/174030627562",
+          "ply": 26
+        }
+      ]
+    },
+    {
+      "classification": "line-opened",
+      "games_affected": 2,
+      "occurrences": 2,
+      "games_reviewed": 12,
+      "breakdowns": [
+        {
+          "dimension": "clock remaining",
+          "value": "120s+",
+          "games_affected": 2,
+          "games_reviewed": 12,
+          "occurrences": 2
+        },
+        {
+          "dimension": "colour",
+          "value": "black",
+          "games_affected": 1,
+          "games_reviewed": 5,
+          "occurrences": 1
+        },
+        {
+          "dimension": "colour",
+          "value": "white",
+          "games_affected": 1,
+          "games_reviewed": 7,
+          "occurrences": 1
+        },
+        {
+          "dimension": "eco",
+          "value": "A01",
+          "games_affected": 1,
+          "games_reviewed": 1,
+          "occurrences": 1
+        },
+        {
+          "dimension": "eco",
+          "value": "E06",
+          "games_affected": 1,
+          "games_reviewed": 1,
+          "occurrences": 1
+        },
+        {
+          "dimension": "phase",
+          "value": "middle (plies 21–60)",
+          "games_affected": 2,
+          "games_reviewed": 11,
+          "occurrences": 2
+        }
+      ],
+      "example_refs": [
+        {
+          "url": "https://www.chess.com/game/live/174006168670",
+          "ply": 23
+        },
+        {
+          "url": "https://www.chess.com/game/live/174030233138",
+          "ply": 32
+        }
+      ]
+    },
+    {
+      "classification": "defender-left",
+      "games_affected": 2,
+      "occurrences": 2,
+      "games_reviewed": 12,
+      "breakdowns": [
+        {
+          "dimension": "clock remaining",
+          "value": "120s+",
+          "games_affected": 2,
+          "games_reviewed": 12,
+          "occurrences": 2
+        },
+        {
+          "dimension": "colour",
+          "value": "black",
+          "games_affected": 1,
+          "games_reviewed": 5,
+          "occurrences": 1
+        },
+        {
+          "dimension": "colour",
+          "value": "white",
+          "games_affected": 1,
+          "games_reviewed": 7,
+          "occurrences": 1
+        },
+        {
+          "dimension": "eco",
+          "value": "B10",
+          "games_affected": 1,
+          "games_reviewed": 2,
+          "occurrences": 1
+        },
+        {
+          "dimension": "eco",
+          "value": "D10",
+          "games_affected": 1,
+          "games_reviewed": 1,
+          "occurrences": 1
+        },
+        {
+          "dimension": "phase",
+          "value": "middle (plies 21–60)",
+          "games_affected": 2,
+          "games_reviewed": 11,
+          "occurrences": 2
+        }
+      ],
+      "example_refs": [
+        {
+          "url": "https://www.chess.com/game/live/173992359850",
+          "ply": 31
+        },
+        {
+          "url": "https://www.chess.com/game/live/174030627562",
+          "ply": 24
+        }
+      ]
+    }
+  ]
+}

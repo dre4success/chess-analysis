@@ -93,15 +93,9 @@ pub fn verify(game: &ApiGame, now: i64) -> Result<CompletedGame, String> {
         .ok_or("missing Termination")?
         .to_ascii_lowercase();
     if termination.is_empty()
-        || [
-            "unterminated",
-            "ongoing",
-            "abandoned",
-            "in progress",
-            "unknown",
-        ]
-        .iter()
-        .any(|s| termination.contains(s))
+        || ["unterminated", "ongoing", "in progress", "unknown"]
+            .iter()
+            .any(|s| termination.contains(s))
     {
         return Err("unconfirmed Termination".into());
     }
@@ -331,5 +325,33 @@ mod tests {
             )
             .is_err()
         );
+    }
+    #[test]
+    fn http_errors_are_distinct_and_user_agent_is_descriptive() {
+        use std::io::{Read, Write};
+        for status in [404, 429, 503] {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let address = listener.local_addr().unwrap();
+            let worker = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = [0; 4096];
+                let n = stream.read(&mut request).unwrap();
+                assert!(String::from_utf8_lossy(&request[..n]).contains("chess-review/0.1"));
+                write!(
+                    stream,
+                    "HTTP/1.1 {status} Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                )
+                .unwrap();
+            });
+            let error = Http::new("a")
+                .get(&format!("http://{address}/"))
+                .unwrap_err();
+            match status {
+                404 => assert!(matches!(error, FetchError::NotFound(_))),
+                429 => assert!(matches!(error, FetchError::RateLimited)),
+                _ => assert!(matches!(error, FetchError::Http(_))),
+            }
+            worker.join().unwrap();
+        }
     }
 }

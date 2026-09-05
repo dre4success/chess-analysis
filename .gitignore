@@ -1,3 +1,5 @@
 /target
 .DS_Store
 /reference
+/.chess-review-cache
+/review-output

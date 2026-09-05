@@ -5,6 +5,10 @@ use shakmaty::{CastlingMode, Chess, EnPassantMode, Position, fen::Fen, uci::UciM
 use crate::evaluation::Evaluation;
 use thiserror::Error;
 
+fn default_threshold() -> u32 {
+    200
+}
+
 pub const SCHEMA_VERSION: &str = "1.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -58,6 +62,8 @@ pub struct EngineMetadata {
     pub nnue_identity: String,
     #[serde(default)]
     pub uci_options: std::collections::BTreeMap<String, String>,
+    #[serde(default = "default_threshold")]
+    pub threshold_cp: u32,
     pub scan_nodes: u64,
     pub deep_nodes: u64,
     pub threads: u16,
@@ -95,6 +101,8 @@ impl ValidatedReview {
 }
 #[derive(Debug, Error, PartialEq)]
 pub enum ValidationError {
+    #[error("invalid review: {0}")]
+    Integrity(String),
     #[error("unsupported review schema version `{found}`; expected `{expected}`")]
     UnsupportedSchemaVersion {
         expected: &'static str,
@@ -181,12 +189,89 @@ pub fn validate(review: Review) -> Result<ValidatedReview, ValidationError> {
         });
     }
 
+    let mut urls = std::collections::BTreeSet::new();
     for (game_index, game) in review.games.iter().enumerate() {
+        if !urls.insert(&game.url) {
+            return Err(ValidationError::Integrity(format!(
+                "duplicate game URL {}",
+                game.url
+            )));
+        }
+        if game
+            .clock_used_pct
+            .is_some_and(|v| !v.is_finite() || !(0.0..=100.0).contains(&v))
+        {
+            return Err(ValidationError::Integrity(format!(
+                "invalid clock percentage in game {game_index}"
+            )));
+        }
+        let mut plies = std::collections::BTreeSet::new();
+        for f in &game.findings {
+            if f.ply == 0 || !plies.insert(f.ply) {
+                return Err(ValidationError::Integrity(format!(
+                    "zero or duplicate ply in game {game_index}"
+                )));
+            }
+            if f.clock_secs.is_some_and(|v| !v.is_finite() || v < 0.0) {
+                return Err(ValidationError::Integrity("invalid clock seconds".into()));
+            }
+            if f.explanation.trim().is_empty() {
+                return Err(ValidationError::Integrity("empty explanation".into()));
+            }
+        }
         for (finding_index, finding) in game.findings.iter().enumerate() {
-            validate_finding(finding, game_index, finding_index)?;
+            validate_finding(finding, game.colour, game_index, finding_index)?;
         }
     }
 
+    let mut classes = std::collections::BTreeSet::new();
+    for p in &review.patterns {
+        if !classes.insert(p.classification) {
+            return Err(ValidationError::Integrity("duplicate pattern".into()));
+        }
+        let affected = review
+            .games
+            .iter()
+            .filter(|g| {
+                g.findings
+                    .iter()
+                    .any(|f| f.classification == p.classification)
+            })
+            .count();
+        let occurrences = review
+            .games
+            .iter()
+            .flat_map(|g| &g.findings)
+            .filter(|f| f.classification == p.classification)
+            .count();
+        if affected != p.games_affected as usize || occurrences != p.occurrences as usize {
+            return Err(ValidationError::Integrity(
+                "pattern counts do not match findings".into(),
+            ));
+        }
+        for e in &p.example_refs {
+            if !review.games.iter().any(|g| {
+                g.url == e.url
+                    && g.findings
+                        .iter()
+                        .any(|f| f.ply == e.ply && f.classification == p.classification)
+            }) {
+                return Err(ValidationError::Integrity(
+                    "unresolved pattern example".into(),
+                ));
+            }
+        }
+    }
+    let expected_classes: std::collections::BTreeSet<_> = review
+        .games
+        .iter()
+        .flat_map(|g| g.findings.iter().map(|f| f.classification))
+        .collect();
+    if classes != expected_classes {
+        return Err(ValidationError::Integrity(
+            "findings are missing from pattern summary".into(),
+        ));
+    }
     Ok(ValidatedReview(review))
 }
 
@@ -199,6 +284,7 @@ fn parse_position(fen_text: &str) -> Result<Chess, String> {
 
 fn validate_finding(
     finding: &Finding,
+    colour: Colour,
     game_index: usize,
     finding_index: usize,
 ) -> Result<(), ValidationError> {
@@ -210,6 +296,15 @@ fn validate_finding(
         }
     })?;
 
+    let expected_turn = match colour {
+        Colour::White => shakmaty::Color::White,
+        Colour::Black => shakmaty::Color::Black,
+    };
+    if before_position.turn() != expected_turn {
+        return Err(ValidationError::Integrity(format!(
+            "game {game_index}, finding {finding_index}: move belongs to the other colour"
+        )));
+    }
     let mut position = before_position.clone();
 
     parse_position(&finding.after_fen).map_err(|reason| ValidationError::InvalidAfterFen {
@@ -289,6 +384,13 @@ fn validate_finding(
         }
     }
 
+    if let (Some(best), Some(first)) = (&finding.best_uci, finding.principal_variation_uci.first())
+        && best != first
+    {
+        return Err(ValidationError::Integrity(format!(
+            "game {game_index}, finding {finding_index}: PV does not begin with best_uci"
+        )));
+    }
     let mut pv_position = before_position;
     for (pv_index, uci) in finding.principal_variation_uci.iter().enumerate() {
         let mv =
@@ -447,6 +549,7 @@ pub(crate) mod tests {
                 nnue_sha256: Some("nnue-sha256".to_owned()),
                 nnue_identity: "embedded".into(),
                 uci_options: Default::default(),
+                threshold_cp: 200,
                 scan_nodes: 150_000,
                 deep_nodes: 1_000_000,
                 threads: 1,
@@ -473,7 +576,7 @@ pub(crate) mod tests {
                 phase_coverage: vec![],
                 clock_band_coverage: vec![],
                 findings: vec![Finding {
-                    ply: 29,
+                    ply: 30,
                     before_fen: "r1bqr1k1/pp3pp1/5n1p/3p4/1b1P3B/1B1Q3P/PP3PP1/R2K2NR b - - 2 15"
                         .to_owned(),
                     after_fen: "r1bqr1k1/pp3pp1/7p/3p4/1b1Pn2B/1B1Q3P/PP3PP1/R2K2NR w - - 3 16"
@@ -504,7 +607,7 @@ pub(crate) mod tests {
                 breakdowns: vec![],
                 example_refs: vec![ExampleRef {
                     url: game_url.to_owned(),
-                    ply: 29,
+                    ply: 30,
                 }],
             }],
         }
@@ -719,5 +822,43 @@ pub(crate) mod tests {
         assert!(super::write(&dir.path().join("missing/review.json"), &validated).is_err());
         assert_eq!(super::read(&path).unwrap(), validated);
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+    #[test]
+    fn rejects_nonfinite_clocks_and_dangling_or_missing_patterns() {
+        let mut r = sample_review();
+        r.games[0].clock_used_pct = Some(f64::NAN);
+        assert!(matches!(validate(r), Err(ValidationError::Integrity(_))));
+        let mut r = sample_review();
+        r.patterns[0].example_refs[0].ply = 100;
+        assert!(matches!(validate(r), Err(ValidationError::Integrity(_))));
+        let mut r = sample_review();
+        r.patterns.clear();
+        assert!(matches!(validate(r), Err(ValidationError::Integrity(_))));
+    }
+    #[test]
+    fn validates_special_moves_by_replaying_canonical_fens_and_san() {
+        use shakmaty::{EnPassantMode, Position, fen::Fen, san::SanPlus};
+        for (fen, uci) in [
+            ("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "e1g1"),
+            ("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "e1c1"),
+            ("7k/8/8/3pP3/8/8/8/7K w - d6 0 1", "e5d6"),
+            ("7k/P7/8/8/8/8/8/7K w - - 0 1", "a7a8q"),
+            ("7k/P7/8/8/8/8/8/7K w - - 0 1", "a7a8n"),
+        ] {
+            let before = super::parse_position(fen).unwrap();
+            let mv = super::legal_move(&before, uci).unwrap();
+            let after = before.clone().play(mv).unwrap();
+            let mut r = sample_review();
+            r.games[0].colour = Colour::White;
+            let f = &mut r.games[0].findings[0];
+            f.before_fen = fen.into();
+            f.after_fen = Fen::from_position(&after, EnPassantMode::Legal).to_string();
+            f.actual_uci = uci.into();
+            f.actual_san = SanPlus::from_move(before, mv).to_string();
+            f.best_uci = Some(uci.into());
+            f.best_san = Some(f.actual_san.clone());
+            f.principal_variation_uci = vec![uci.into()];
+            validate(r).unwrap();
+        }
     }
 }
