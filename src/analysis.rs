@@ -192,6 +192,17 @@ pub fn candidates(
     confirmed.sort_by_key(|c| c.ply);
     Ok(confirmed)
 }
+pub fn findings(
+    game: &CompletedGame,
+    user: Color,
+    engine: &mut impl PositionEngine,
+    config: AnalysisConfig,
+) -> Result<Vec<crate::review::Finding>, EngineError> {
+    Ok(candidates(game, user, engine, config)?
+        .iter()
+        .map(crate::detectors::classify)
+        .collect())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
