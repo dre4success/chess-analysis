@@ -16,3 +16,5 @@ mod test {
         assert_eq!(project_name(), "chess-review")
     }
 }
+
+pub mod engine;
