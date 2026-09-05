@@ -19,6 +19,9 @@ pub struct CompletedGame {
 }
 
 impl CompletedGame {
+    pub fn clocks_ms(&self) -> &[Option<u64>] {
+        self.game.clocks_ms()
+    }
     #[must_use]
     pub fn headers(&self) -> &BTreeMap<String, String> {
         self.game.headers()

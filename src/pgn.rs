@@ -14,9 +14,13 @@ pub struct RawGame {
     moves: Vec<UciMove>,
     movetext_outcome: Option<Outcome>,
     initial_position: Chess,
+    clocks_ms: Vec<Option<u64>>,
 }
 
 impl RawGame {
+    pub(crate) fn clocks_ms(&self) -> &[Option<u64>] {
+        &self.clocks_ms
+    }
     pub(crate) fn headers(&self) -> &BTreeMap<String, String> {
         &self.headers
     }
@@ -59,6 +63,7 @@ struct MovetextState {
     moves: Vec<UciMove>,
     outcome: Option<Outcome>,
     initial_position: Chess,
+    clocks_ms: Vec<Option<u64>>,
 }
 
 #[derive(Debug, Default)]
@@ -108,6 +113,7 @@ impl Visitor for RawGameVisitor {
             initial_position: position.clone(),
             position,
             moves: Vec::new(),
+            clocks_ms: Vec::new(),
             outcome: None,
         })
     }
@@ -127,10 +133,26 @@ impl Visitor for RawGameVisitor {
         let uci = chess_move.to_uci(CastlingMode::Standard);
         movetext.position.play_unchecked(chess_move);
         movetext.moves.push(uci);
+        movetext.clocks_ms.push(None);
 
         ControlFlow::Continue(())
     }
 
+    fn comment(
+        &mut self,
+        movetext: &mut Self::Movetext,
+        comment: pgn_reader::RawComment<'_>,
+    ) -> ControlFlow<Self::Output> {
+        if let Some(clock) = movetext.clocks_ms.last_mut() {
+            let text = String::from_utf8_lossy(comment.0);
+            if let Some((_, tail)) = text.split_once("[%clk ") {
+                *clock = tail
+                    .split_once(']')
+                    .and_then(|(value, _)| parse_clock_ms(value));
+            }
+        }
+        ControlFlow::Continue(())
+    }
     fn outcome(
         &mut self,
         movetext: &mut Self::Movetext,
@@ -146,6 +168,7 @@ impl Visitor for RawGameVisitor {
             moves: movetext.moves,
             movetext_outcome: movetext.outcome,
             initial_position: movetext.initial_position,
+            clocks_ms: movetext.clocks_ms,
         })
     }
 }
@@ -179,6 +202,32 @@ pub fn parse_one(input: &[u8]) -> Result<Option<RawGame>, ParseGameError> {
     let parsed = reader.read_game(&mut RawGameVisitor)?;
 
     parsed.transpose()
+}
+
+pub fn parse_many(input: &[u8]) -> Result<Vec<RawGame>, ParseGameError> {
+    let mut reader = Reader::new(Cursor::new(input));
+    let mut games = Vec::new();
+    while let Some(game) = reader.read_game(&mut RawGameVisitor)? {
+        games.push(game?);
+    }
+    Ok(games)
+}
+
+/// %clk is time remaining; %timestamp is intentionally not interpreted.
+pub fn parse_clock_ms(text: &str) -> Option<u64> {
+    let parts: Vec<_> = text.trim().split(':').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let h: u64 = parts[0].parse().ok()?;
+    let m: u64 = parts[1].parse().ok()?;
+    let secs: f64 = parts[2].parse().ok()?;
+    if m >= 60 || !secs.is_finite() || !(0.0..60.0).contains(&secs) {
+        return None;
+    }
+    h.checked_mul(3_600_000)?
+        .checked_add(m * 60_000)?
+        .checked_add((secs * 1000.0).round() as u64)
 }
 
 #[cfg(test)]

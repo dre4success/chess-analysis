@@ -20,4 +20,5 @@ mod test {
 pub mod analysis;
 pub mod detectors;
 pub mod engine;
+pub mod patterns;
 pub mod stockfish;

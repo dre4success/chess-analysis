@@ -36,7 +36,7 @@ pub enum Confidence {
     Experimental,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Classification {
     LineOpened,
@@ -359,6 +359,10 @@ pub struct GameReview {
     pub clock_used_pct: Option<f64>,
     pub eco: Option<String>,
     pub findings: Vec<Finding>,
+    #[serde(default)]
+    pub phase_coverage: Vec<String>,
+    #[serde(default)]
+    pub clock_band_coverage: Vec<String>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Opponent {
@@ -395,7 +399,20 @@ pub struct Pattern {
     pub classification: Classification,
     pub games_affected: u32,
     pub occurrences: u32,
+    #[serde(default)]
+    pub games_reviewed: u32,
+    #[serde(default)]
+    pub breakdowns: Vec<Breakdown>,
     pub example_refs: Vec<ExampleRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Breakdown {
+    pub dimension: String,
+    pub value: String,
+    pub games_affected: u32,
+    pub games_reviewed: u32,
+    pub occurrences: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -405,7 +422,7 @@ pub struct ExampleRef {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use serde_json::{Value, json};
 
     use super::{
@@ -415,7 +432,7 @@ mod tests {
     };
     use crate::evaluation::{Evaluation, ReviewSide};
 
-    fn sample_review() -> Review {
+    pub(crate) fn sample_review() -> Review {
         let game_url = "https://www.chess.com/game/live/172386685690";
 
         Review {
@@ -453,6 +470,8 @@ mod tests {
                 time_control: "600".to_owned(),
                 clock_used_pct: Some(36.0),
                 eco: Some("B10".to_owned()),
+                phase_coverage: vec![],
+                clock_band_coverage: vec![],
                 findings: vec![Finding {
                     ply: 29,
                     before_fen: "r1bqr1k1/pp3pp1/5n1p/3p4/1b1P3B/1B1Q3P/PP3PP1/R2K2NR b - - 2 15"
@@ -481,6 +500,8 @@ mod tests {
                 classification: Classification::LineOpened,
                 games_affected: 1,
                 occurrences: 1,
+                games_reviewed: 1,
+                breakdowns: vec![],
                 example_refs: vec![ExampleRef {
                     url: game_url.to_owned(),
                     ply: 29,
