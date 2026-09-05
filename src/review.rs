@@ -54,6 +54,10 @@ pub struct EngineMetadata {
     pub version: String,
     pub executable_sha256: String,
     pub nnue_sha256: Option<String>,
+    #[serde(default)]
+    pub nnue_identity: String,
+    #[serde(default)]
+    pub uci_options: std::collections::BTreeMap<String, String>,
     pub scan_nodes: u64,
     pub deep_nodes: u64,
     pub threads: u16,
@@ -424,6 +428,8 @@ mod tests {
                 version: "17".to_owned(),
                 executable_sha256: "engine-sha256".to_owned(),
                 nnue_sha256: Some("nnue-sha256".to_owned()),
+                nnue_identity: "embedded".into(),
+                uci_options: Default::default(),
                 scan_nodes: 150_000,
                 deep_nodes: 1_000_000,
                 threads: 1,

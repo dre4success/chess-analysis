@@ -18,3 +18,4 @@ mod test {
 }
 
 pub mod engine;
+pub mod stockfish;
