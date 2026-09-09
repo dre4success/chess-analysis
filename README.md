@@ -4,6 +4,31 @@ A Rust CLI for reviewing **completed** chess games with Stockfish. It produces a
 canonical `review.json`, a concise `digest.md` for coaching, and an offline HTML
 report with before/after boards. Repeated patterns rank by games affected.
 
+## Tempo web interface
+
+The `web/` app adds a personal chess studio: enter a Chess.com username, import recent
+completed games, explore a featured position, track rating/opening trends, and replay
+key moments. Rust serves the static React UI and API. Full native Stockfish 18 evaluates
+positions through the original shared Rust pipeline. Reviews run in a persistent SQLite
+queue, continue after closing the tab and resume after server restarts.
+
+```sh
+docker compose up --build -d --wait
+```
+
+Open http://localhost:8080. Docker includes Rust, the static UI and the complete native
+Stockfish engine. Prettier formats the frontend; `cargo fmt` formats Rust.
+See [self-hosting and GitHub Actions](docs/SELF_HOSTING.md) for prepared deployment
+workflows and [web development](web/README.md) for the UI. No remote deployment is
+triggered by these local changes.
+
+Production uses [compose.prod.yaml](compose.prod.yaml) with your existing Traefik
+on `web_proxy_net`, `web`/`websecure` entrypoints and `myresolver` TLS resolver.
+It routes to Tempo's internal port 8080 without publishing a host port.
+
+GitHub Actions is disabled for now. Workflow definitions are saved for later manual
+use; pushes and pull requests do not trigger builds, publishing or deployment.
+
 ## Run
 
 Requires a current Rust toolchain (edition 2024) and Stockfish on PATH, or an explicit
@@ -84,8 +109,8 @@ STOCKFISH=/opt/homebrew/bin/stockfish cargo test -- --ignored --nocapture
 ```
 
 See `VALIDATION.md` for observed results and `PLAN.md` for the original roadmap.
-Stages 12–14 (API, web UI, hosting) remain optional and depend on the Stage 11
-usefulness decision. Release still requires a human to inspect semantic labels
+The Tempo web rebuild was requested on 2026-09-08. The earlier Stage 11
+semantic-label usefulness review remains a separate human judgment. Release still requires a human to inspect semantic labels
 and identify a practice priority worth acting on. The software does not substitute
 an engine verdict for that judgment.
 
