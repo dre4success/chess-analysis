@@ -1,0 +1,80 @@
+name: Deploy Tempo
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Published image by digest: ghcr.io/owner/repo@sha256:…"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tempo-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      TEMPO_IMAGE: ${{ inputs.image }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          [[ "$TEMPO_IMAGE" =~ ^ghcr.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
+          [[ "$TEMPO_IMAGE" == "ghcr.io/${REPOSITORY,,}@sha256:"* ]]
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
+          [[ "$DEPLOY_PATH" =~ ^/[a-zA-Z0-9/_-]+$ && "$DEPLOY_PATH" != / ]]
+          [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]]
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Install Compose definition
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "$DEPLOY_PORT" \
+            "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -P "$DEPLOY_PORT" \
+            compose.prod.yaml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/docker-compose.yml"
+      - name: Pull and start the chosen image
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "$DEPLOY_PORT" \
+            "$DEPLOY_USER@$DEPLOY_HOST" "bash -s -- '$DEPLOY_PATH' '$TEMPO_IMAGE'" <<'REMOTE'
+          set -euo pipefail
+          cd "$1"
+          export TEMPO_IMAGE="$2"
+          if [[ ! -s .env ]]; then
+            echo 'Create .env from .env.production.example in the deployment directory first.' >&2
+            exit 1
+          fi
+          docker network inspect web_proxy_net > /dev/null
+          tag_tmp=$(mktemp .tag.env.XXXXXX)
+          trap 'rm -f "$tag_tmp"' EXIT
+          chmod 600 "$tag_tmp"
+          printf 'TEMPO_IMAGE=%s\n' "$TEMPO_IMAGE" > "$tag_tmp"
+          docker compose -f docker-compose.yml --env-file .env --env-file "$tag_tmp" config --quiet
+          docker compose -f docker-compose.yml --env-file .env --env-file "$tag_tmp" pull
+          docker compose -f docker-compose.yml --env-file .env --env-file "$tag_tmp" up -d --no-build --wait --wait-timeout 120
+          mv "$tag_tmp" tag.env
+          printf '%s\n' "$TEMPO_IMAGE" > .deployed-image
+          REMOTE
+      - name: Remove temporary SSH credentials
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519
