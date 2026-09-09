@@ -1,0 +1,42 @@
+name: tempo
+services:
+  tempo:
+    image: ${TEMPO_IMAGE:?Set TEMPO_IMAGE to the published image digest}
+    restart: unless-stopped
+    init: true
+    volumes:
+      - tempo-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 90s
+    mem_limit: 1g
+    cpus: 2
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: web_proxy_net
+      traefik.http.routers.tempo.rule: "Host(`${TEMPO_DOMAIN:?Set TEMPO_DOMAIN to your public hostname}`)"
+      traefik.http.routers.tempo.entrypoints: websecure
+      traefik.http.routers.tempo.tls: "true"
+      traefik.http.routers.tempo.tls.certresolver: myresolver
+      traefik.http.routers.tempo.service: tempo
+      traefik.http.routers.tempo.middlewares: ${TEMPO_TRAEFIK_MIDDLEWARES:-}
+      traefik.http.services.tempo.loadbalancer.server.port: "8080"
+      traefik.http.routers.tempo-http.rule: "Host(`${TEMPO_DOMAIN:?Set TEMPO_DOMAIN to your public hostname}`)"
+      traefik.http.routers.tempo-http.entrypoints: web
+      traefik.http.routers.tempo-http.service: tempo
+      traefik.http.routers.tempo-http.middlewares: tempo-redirect-to-https
+      traefik.http.middlewares.tempo-redirect-to-https.redirectscheme.scheme: https
+      traefik.http.middlewares.tempo-redirect-to-https.redirectscheme.permanent: "true"
+    networks:
+      - web_proxy_net
+volumes:
+  tempo-data:
+networks:
+  web_proxy_net:
+    external: true
+    name: web_proxy_net
