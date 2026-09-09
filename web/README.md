@@ -12,7 +12,7 @@ docker compose up --build -d --wait
 
 Open http://localhost:8080. Rust serves both the static React UI and its API. The container contains the complete native Stockfish 18 engine and its full networks. There is no Node server or browser engine in the production runtime.
 
-Production packaging is in `compose.prod.yaml` at the repository root. GitHub Actions is disabled pending deployment setup.
+See the [root README](../README.md) for API and deployment instructions.
 
 ## Develop
 
@@ -55,7 +55,7 @@ npm run build
 
 Prettier formats the application code. Oxlint checks the Vite application, with Next.js-only rules removed. Composite boards retain appropriate ARIA roles; replay is keyboard accessible. Root Rust code uses `cargo fmt`, tests and Clippy.
 
-The tests cover source statistics, completion boundaries, legal finding replay, native review conversion, saved-review polling, disconnection and HTTP errors. Browser visual and interaction QA has not been performed in this environment. Optional WebMCP registration is feature-detected and remains unverified.
+The tests cover source statistics, completion boundaries, legal finding replay, native review conversion, saved-review polling, disconnection and HTTP errors.
 
 ## Data and search limits
 
