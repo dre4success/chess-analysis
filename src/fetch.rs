@@ -1,13 +1,8 @@
 use crate::{
     completion::{CompletedGame, CompletionPolicy, LocalPgnPolicy},
     pgn,
-    review::atomic_write,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    path::{Path, PathBuf},
-    time::Duration,
-};
 
 #[derive(Debug, thiserror::Error)]
 pub enum FetchError {
@@ -47,6 +42,7 @@ pub struct Month {
     pub games: Vec<ApiGame>,
 }
 #[derive(Debug, Deserialize, Serialize)]
+#[cfg(not(target_arch = "wasm32"))]
 struct Archives {
     archives: Vec<String>,
 }
@@ -138,129 +134,140 @@ pub fn verify(game: &ApiGame, now: i64) -> Result<CompletedGame, String> {
     }
     Ok(completed)
 }
-pub trait Transport {
-    fn get(&mut self, url: &str) -> Result<Vec<u8>, FetchError>;
-}
-pub struct Http {
-    agent: ureq::Agent,
-}
-impl Http {
-    pub fn new(user: &str) -> Self {
-        let config = ureq::Agent::config_builder()
-            .timeout_global(Some(Duration::from_secs(30)))
-            .user_agent(format!(
-                "chess-review/0.1 (personal post-game review; username: {user})"
-            ))
-            .build();
-        Self {
-            agent: config.into(),
-        }
+#[cfg(not(target_arch = "wasm32"))]
+mod native {
+    use super::*;
+    use crate::review::atomic_write;
+    use std::{
+        path::{Path, PathBuf},
+        time::Duration,
+    };
+    pub trait Transport {
+        fn get(&mut self, url: &str) -> Result<Vec<u8>, FetchError>;
     }
-}
-impl Transport for Http {
-    fn get(&mut self, url: &str) -> Result<Vec<u8>, FetchError> {
-        let mut response = self.agent.get(url).call().map_err(|e| match e {
-            ureq::Error::StatusCode(404) => FetchError::NotFound(url.into()),
-            ureq::Error::StatusCode(429) => FetchError::RateLimited,
-            ureq::Error::Timeout(_) => FetchError::Timeout,
-            other => FetchError::Http(other.to_string()),
-        })?;
-        response
-            .body_mut()
-            .with_config()
-            .limit(64 * 1024 * 1024)
-            .read_to_vec()
-            .map_err(|e| FetchError::Http(e.to_string()))
+    pub struct Http {
+        agent: ureq::Agent,
     }
-}
-pub struct Client<T> {
-    pub transport: T,
-    pub cache: PathBuf,
-    pub offline: bool,
-}
-fn decode<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, FetchError> {
-    serde_json::from_slice(bytes).map_err(|e| FetchError::Malformed(e.to_string()))
-}
-impl<T: Transport> Client<T> {
-    fn load(&mut self, url: &str, path: &Path, immutable: bool) -> Result<Vec<u8>, FetchError> {
-        if (immutable || self.offline) && path.exists() {
-            return Ok(std::fs::read(path)?);
-        }
-        if self.offline {
-            return Err(FetchError::Offline(url.into()));
-        }
-        let bytes = self.transport.get(url)?;
-        // Decode at least JSON before replacing cache. Typed validation is done by callers.
-        let _: serde_json::Value = decode(&bytes)?;
-        Ok(bytes)
-    }
-    pub fn recent(
-        &mut self,
-        user: &str,
-        last: usize,
-        current_month: &str,
-    ) -> Result<Vec<ApiGame>, FetchError> {
-        let user = username(user)?;
-        let dir = self.cache.join(&user);
-        std::fs::create_dir_all(&dir)?;
-        let index = dir.join("archives.json");
-        let root = format!("https://api.chess.com/pub/player/{user}/games/");
-        let bytes = self.load(&format!("{root}archives"), &index, false)?;
-        let mut archives: Archives = decode(&bytes)?;
-        for url in &archives.archives {
-            month_key(&root, url)?;
-        }
-        if !self.offline {
-            atomic_write(&index, &bytes)?;
-        }
-        archives.archives.sort();
-        archives.archives.dedup();
-        let mut games = Vec::new();
-        let mut seen = std::collections::BTreeSet::new();
-        for url in archives.archives.into_iter().rev() {
-            let key = month_key(&root, &url)?;
-            if key.as_str() > current_month {
-                return Err(FetchError::Malformed("future archive".into()));
+    impl Http {
+        pub fn new(user: &str) -> Self {
+            let config = ureq::Agent::config_builder()
+                .timeout_global(Some(Duration::from_secs(30)))
+                .user_agent(format!(
+                    "chess-review/0.1 (personal post-game review; username: {user})"
+                ))
+                .build();
+            Self {
+                agent: config.into(),
             }
-            let path = dir.join(format!("{key}.json"));
-            let immutable = key.as_str() < current_month;
-            let existed = path.exists();
-            let bytes = self.load(&url, &path, immutable)?;
-            let month: Month = decode(&bytes)?;
-            if !self.offline && !(immutable && existed) {
-                atomic_write(&path, &bytes)?;
+        }
+    }
+    impl Transport for Http {
+        fn get(&mut self, url: &str) -> Result<Vec<u8>, FetchError> {
+            let mut response = self.agent.get(url).call().map_err(|e| match e {
+                ureq::Error::StatusCode(404) => FetchError::NotFound(url.into()),
+                ureq::Error::StatusCode(429) => FetchError::RateLimited,
+                ureq::Error::Timeout(_) => FetchError::Timeout,
+                other => FetchError::Http(other.to_string()),
+            })?;
+            response
+                .body_mut()
+                .with_config()
+                .limit(64 * 1024 * 1024)
+                .read_to_vec()
+                .map_err(|e| FetchError::Http(e.to_string()))
+        }
+    }
+    pub struct Client<T> {
+        pub transport: T,
+        pub cache: PathBuf,
+        pub offline: bool,
+    }
+    fn decode<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, FetchError> {
+        serde_json::from_slice(bytes).map_err(|e| FetchError::Malformed(e.to_string()))
+    }
+    impl<T: Transport> Client<T> {
+        fn load(&mut self, url: &str, path: &Path, immutable: bool) -> Result<Vec<u8>, FetchError> {
+            if (immutable || self.offline) && path.exists() {
+                return Ok(std::fs::read(path)?);
             }
-            for game in month.games {
-                if game.rated && game.time_class == "rapid" && seen.insert(game.url.clone()) {
-                    games.push(game);
+            if self.offline {
+                return Err(FetchError::Offline(url.into()));
+            }
+            let bytes = self.transport.get(url)?;
+            // Decode at least JSON before replacing cache. Typed validation is done by callers.
+            let _: serde_json::Value = decode(&bytes)?;
+            Ok(bytes)
+        }
+        pub fn recent(
+            &mut self,
+            user: &str,
+            last: usize,
+            current_month: &str,
+        ) -> Result<Vec<ApiGame>, FetchError> {
+            let user = username(user)?;
+            let dir = self.cache.join(&user);
+            std::fs::create_dir_all(&dir)?;
+            let index = dir.join("archives.json");
+            let root = format!("https://api.chess.com/pub/player/{user}/games/");
+            let bytes = self.load(&format!("{root}archives"), &index, false)?;
+            let mut archives: Archives = decode(&bytes)?;
+            for url in &archives.archives {
+                month_key(&root, url)?;
+            }
+            if !self.offline {
+                atomic_write(&index, &bytes)?;
+            }
+            archives.archives.sort();
+            archives.archives.dedup();
+            let mut games = Vec::new();
+            let mut seen = std::collections::BTreeSet::new();
+            for url in archives.archives.into_iter().rev() {
+                let key = month_key(&root, &url)?;
+                if key.as_str() > current_month {
+                    return Err(FetchError::Malformed("future archive".into()));
+                }
+                let path = dir.join(format!("{key}.json"));
+                let immutable = key.as_str() < current_month;
+                let existed = path.exists();
+                let bytes = self.load(&url, &path, immutable)?;
+                let month: Month = decode(&bytes)?;
+                if !self.offline && !(immutable && existed) {
+                    atomic_write(&path, &bytes)?;
+                }
+                for game in month.games {
+                    if game.rated && game.time_class == "rapid" && seen.insert(game.url.clone()) {
+                        games.push(game);
+                    }
+                }
+                if games.len() >= last {
+                    break;
                 }
             }
-            if games.len() >= last {
-                break;
-            }
+            games.sort_by(|a, b| (b.end_time, &b.url).cmp(&(a.end_time, &a.url)));
+            games.truncate(last);
+            games.reverse();
+            Ok(games)
         }
-        games.sort_by(|a, b| (b.end_time, &b.url).cmp(&(a.end_time, &a.url)));
-        games.truncate(last);
-        games.reverse();
-        Ok(games)
+    }
+    pub(super) fn month_key(root: &str, url: &str) -> Result<String, FetchError> {
+        let tail = url
+            .strip_prefix(root)
+            .ok_or_else(|| FetchError::Malformed("untrusted archive URL".into()))?;
+        let valid = tail.len() == 7
+            && tail.as_bytes()[4] == b'/'
+            && tail
+                .bytes()
+                .enumerate()
+                .all(|(i, b)| i == 4 || b.is_ascii_digit())
+            && ("01"..="12").contains(&&tail[5..]);
+        if !valid {
+            return Err(FetchError::Malformed("invalid archive month".into()));
+        }
+        Ok(tail.replace('/', "-"))
     }
 }
-fn month_key(root: &str, url: &str) -> Result<String, FetchError> {
-    let tail = url
-        .strip_prefix(root)
-        .ok_or_else(|| FetchError::Malformed("untrusted archive URL".into()))?;
-    let valid = tail.len() == 7
-        && tail.as_bytes()[4] == b'/'
-        && tail
-            .bytes()
-            .enumerate()
-            .all(|(i, b)| i == 4 || b.is_ascii_digit())
-        && ("01"..="12").contains(&&tail[5..]);
-    if !valid {
-        return Err(FetchError::Malformed("invalid archive month".into()));
-    }
-    Ok(tail.replace('/', "-"))
-}
+#[cfg(not(target_arch = "wasm32"))]
+pub use native::*;
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -423,6 +423,7 @@ pub enum ReviewIoError {
     Validation(#[from] ValidationError),
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn read(path: &std::path::Path) -> Result<ValidatedReview, ReviewIoError> {
     Ok(validate(serde_json::from_reader(std::fs::File::open(
         path,
@@ -430,12 +431,14 @@ pub fn read(path: &std::path::Path) -> Result<ValidatedReview, ReviewIoError> {
 }
 
 /// Only validated, immutable reviews can cross the persistence boundary.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn write(path: &std::path::Path, review: &ValidatedReview) -> Result<(), ReviewIoError> {
     let bytes = serde_json::to_vec_pretty(review.as_review())?;
     atomic_write(path, &bytes)?;
     Ok(())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn atomic_write(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
     let parent = path

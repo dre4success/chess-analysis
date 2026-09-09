@@ -267,7 +267,7 @@ impl Drop for UciEngine {
         self.shutdown();
     }
 }
-fn parse_info(
+pub(crate) fn parse_info(
     line: &str,
     user_turn: bool,
 ) -> Result<Option<(Evaluation, Vec<String>)>, EngineError> {

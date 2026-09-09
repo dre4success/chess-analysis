@@ -24,3 +24,10 @@ pub mod fetch;
 pub mod patterns;
 pub mod render;
 pub mod stockfish;
+
+pub mod browser;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod pipeline;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod server;

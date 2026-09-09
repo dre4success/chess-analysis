@@ -3,3 +3,8 @@
 /reference
 /.chess-review-cache
 /review-output
+
+/tempo-data
+/.env
+/tag.env
+/.tag.env.*
