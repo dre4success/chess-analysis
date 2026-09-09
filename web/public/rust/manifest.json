@@ -1,0 +1,8 @@
+{
+  "engine": "chess-review",
+  "scanNodes": 150000,
+  "confirmationNodes": 1000000,
+  "thresholdCp": 200,
+  "sha256": "1033201b81e81d4563ad4ec3a60355172504878d336c68cd38691d1960f3b74a",
+  "sourceSha256": "2bd5626db077a7ac9b0a45ad514ad3db80640bb71456ed85a2b42ebd8c7adfba"
+}
