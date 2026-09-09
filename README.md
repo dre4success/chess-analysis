@@ -18,9 +18,8 @@ docker compose up --build -d --wait
 
 Open http://localhost:8080. Docker includes Rust, the static UI and the complete native
 Stockfish engine. Prettier formats the frontend; `cargo fmt` formats Rust.
-See [self-hosting and GitHub Actions](docs/SELF_HOSTING.md) for prepared deployment
-workflows and [web development](web/README.md) for the UI. No remote deployment is
-triggered by these local changes.
+See [web development](web/README.md) for the UI. Deployment workflows are prepared
+in `.github/workflows/` for later setup.
 
 Production uses [compose.prod.yaml](compose.prod.yaml) with your existing Traefik
 on `web_proxy_net`, `web`/`websecure` entrypoints and `myresolver` TLS resolver.

@@ -12,7 +12,7 @@ docker compose up --build -d --wait
 
 Open http://localhost:8080. Rust serves both the static React UI and its API. The container contains the complete native Stockfish 18 engine and its full networks. There is no Node server or browser engine in the production runtime.
 
-For image publishing and deployment preparation, see [SELF_HOSTING.md](../docs/SELF_HOSTING.md).
+Production packaging is in `compose.prod.yaml` at the repository root. GitHub Actions is disabled pending deployment setup.
 
 ## Develop
 

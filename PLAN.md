@@ -7,8 +7,8 @@
 **Implementation update — 5 September 2026:** resumed the unfinished Stage 3
 worktree and implemented through the Stage 11 CLI. Automated tests, real Stockfish
 regressions and a 12-game acceptance run are recorded in `VALIDATION.md`. Stage 11's
-human semantic-label review and practice-change decision remain pending in
-`docs/ACCEPTANCE.md`; Stages 12–14 have not started. The user authorized autonomous
+human semantic-label review and practice-change decision remain pending;
+Stages 12–14 have not started. The user authorized autonomous
 implementation for this continuation, superseding the original typing workflow.
 
 ---
@@ -26,29 +26,29 @@ protects, and how its tests would catch a regression.
 structural-scan fallback is postponed: it's explicitly a graceful degradation, and
 building a second analysis path before the primary one works costs more than it
 returns. The `Confidence` vocabulary from Stage 1 still exists — it describes how a
-*detector* was validated, independent of mode — so nothing is painted into a corner.
+_detector_ was validated, independent of mode — so nothing is painted into a corner.
 
 ---
 
 ## The stages
 
-| # | Goal |
-|---|---|
-| 0 | A Cargo package that builds and tests |
-| 1 | Represent evaluations without magic numbers |
-| 2 | Read a PGN; refuse anything not provably finished |
-| 3 | Write and validate `review.json` |
-| 4 | Talk UCI to a fake engine |
-| 5 | Talk UCI to real Stockfish |
-| 6 | Find candidate mistakes in one game |
-| 7 | Explain one candidate — the `line-opened` detector |
-| 8 | The rest of the detector set |
-| 9 | Rank habits across games |
-| 10 | Fetch games from chess.com |
-| 11 | Ship the CLI, then judge whether it's useful |
-| 12 | *Optional* — local HTTP API for the UI |
-| 13 | *Sketch* — web UI reading `review.json` |
-| 14 | *Sketch* — deploy it |
+| #   | Goal                                               |
+| --- | -------------------------------------------------- |
+| 0   | A Cargo package that builds and tests              |
+| 1   | Represent evaluations without magic numbers        |
+| 2   | Read a PGN; refuse anything not provably finished  |
+| 3   | Write and validate `review.json`                   |
+| 4   | Talk UCI to a fake engine                          |
+| 5   | Talk UCI to real Stockfish                         |
+| 6   | Find candidate mistakes in one game                |
+| 7   | Explain one candidate — the `line-opened` detector |
+| 8   | The rest of the detector set                       |
+| 9   | Rank habits across games                           |
+| 10  | Fetch games from chess.com                         |
+| 11  | Ship the CLI, then judge whether it's useful       |
+| 12  | _Optional_ — local HTTP API for the UI             |
+| 13  | _Sketch_ — web UI reading `review.json`            |
+| 14  | _Sketch_ — deploy it                               |
 
 Stages 0–3 need no engine and no network. **Stage 11 is a go/no-go**: if the tool
 isn't useful, we fix the core rather than adding features. Stages 12–14 are sketched,
@@ -92,7 +92,7 @@ pub enum Evaluation {
 ```
 
 Two deliberate choices: **mate is a separate variant**, so it can never be serialized
-as a centipawn sentinel — SPEC §12's *"you lost 998 points"* bug. And **the winner is
+as a centipawn sentinel — SPEC §12's _"you lost 998 points"_ bug. And **the winner is
 a field, not a sign**, which removes a class of sign-flip bug at the POV boundary.
 
 You need exactly one escape hatch — ranking findings means comparing a mate against a
@@ -105,7 +105,7 @@ pub fn ordering_score(&self) -> i32
 ```
 
 The enum alone doesn't make the sentinel bug impossible — this method reintroduces a
-flat integer. Safety comes from it being *one* named, tested, audited chokepoint
+flat integer. Safety comes from it being _one_ named, tested, audited chokepoint
 instead of arithmetic scattered everywhere.
 
 **You'll learn:** enums with named fields, derive macros, methods, exhaustive `match`,
@@ -129,11 +129,11 @@ through a policy. SPEC §3.1's "non-negotiable" boundary becomes `rustc`'s job.
 
 **Policies are per-source** — they produce the same type but need different evidence:
 
-- *chess.com API* — finished `Result`, matching movetext marker, source metadata
-- *local PGN* — its own documented rules; many valid PGNs have no `Termination`
+- _chess.com API_ — finished `Result`, matching movetext marker, source metadata
+- _local PGN_ — its own documented rules; many valid PGNs have no `Termination`
 
 > **SPEC v2.0 §3.1 was wrong; v2.1 fixes it.** It said reject "any URL matching a
-> live/ongoing game pattern" — but chess.com keeps *finished* games at
+> live/ongoing game pattern" — but chess.com keeps _finished_ games at
 > `/game/live/{id}`, including the spec's own §7.2 example. Match `/game/ongoing/`,
 > `/play/online`, and query params instead. `Result` and `Termination` are what
 > actually prove finishedness.
@@ -228,9 +228,9 @@ written down honestly.
 Two passes, per SPEC §8. **Pass 1** scans every move at ~150k nodes. **Pass 2**
 confirms only the shortlist at ~1M nodes.
 
-**Verdicts come only from pass 2.** At scan budget the *ordering* of near-boundary
+**Verdicts come only from pass 2.** At scan budget the _ordering_ of near-boundary
 candidates isn't reliable, so pass 1 shortlists and decides nothing. Cap at three
-findings per game, applied *after* confirmation.
+findings per game, applied _after_ confirmation.
 
 **A `Candidate` is its own internal type, not a `Finding`.** It carries legal
 before/actual/after positions and structured evaluations — and nothing else. It has no
@@ -241,7 +241,7 @@ classification, because nothing has explained it yet, and it never reaches
 would be a contradiction. Two types, two contracts.)
 
 **Regression test — the winning queen sacrifice.** AUDIT §1.3 caught the prototype
-reporting a *winning* combination as a 4-point blunder, because its material resolver
+reporting a _winning_ combination as a 4-point blunder, because its material resolver
 stopped one ply before the quiet promotion `a1=Q+`. That position belongs here: with
 Stockfish authoritative, the pipeline must **not** flag it. It's the cleanest proof
 that the engine has replaced the arithmetic that got it wrong.
@@ -269,10 +269,10 @@ evidence with engine evaluations into a finding — so a detector is structurall
 incapable of manufacturing a verdict. That's SPEC §5's core boundary, enforced by
 types.
 
-**Done when:** it fires on the spec's `Nf6-e4` example. It does *not* fire when a
-moved queen is simply attacked, and does *not* fire when the line already existed.
-Every synthetic position asserts its own preconditions first — AUDIT §2.3 found *seven
-bad test positions versus two real bugs*, so a fixture that doesn't prove its own setup
+**Done when:** it fires on the spec's `Nf6-e4` example. It does _not_ fire when a
+moved queen is simply attacked, and does _not_ fire when the line already existed.
+Every synthetic position asserts its own preconditions first — AUDIT §2.3 found _seven
+bad test positions versus two real bugs_, so a fixture that doesn't prove its own setup
 is a liability.
 
 **You'll learn:** pure functions, pattern matching, table-driven tests, lifetimes on
@@ -294,15 +294,15 @@ and for a tool whose whole pitch is verifiability, it's the only defensible answ
 **Two things from `AUDIT.md`:**
 
 - **`line-opened` must split from `defender-left`** (§2.1). Discriminate on what the
-  vacated square was doing: *on the ray* between attacker and victim → `line-opened`;
-  *in the victim's defender set* → `defender-left`. Different lessons, different fixes
+  vacated square was doing: _on the ray_ between attacker and victim → `line-opened`;
+  _in the victim's defender set_ → `defender-left`. Different lessons, different fixes
   at the board.
 - **SEE arrives here, not earlier** — only as wide as `line-onto` and `capture-cost`
   actually need: capture-promotions, legal recaptures, pins, x-rays. Nothing more.
   **We do not port `resolved_balance()` or quiescence** unless a later stage proves we
   need it; the prototype needed it only because it had no engine.
 
-  *Note the distinction:* AUDIT §1.3's promotion bug was a **quiescence** failure — it
+  _Note the distinction:_ AUDIT §1.3's promotion bug was a **quiescence** failure — it
   missed the quiet promotion `a1=Q+`, a move SEE would never consider anyway, since
   SEE only resolves captures onto one square. That bug's regression test lives in
   Stage 6, against the engine pipeline. Don't let it drive SEE's design.
@@ -319,14 +319,14 @@ primary label.
 
 ## Stage 9 — Patterns across games
 
-**Goal:** turn findings into a training plan. SPEC §5.3 — *this is the product*.
+**Goal:** turn findings into a training plan. SPEC §5.3 — _this is the product_.
 
 **Rank by games affected, not occurrences.** One 80-move game must not outweigh five
 separate games. Report the denominator too. Break down by colour, phase, ECO and clock
 band. No strong conclusions from tiny groups.
 
-**Clock parsing is done carefully or not at all.** `%clk` is time *remaining*, so
-deriving time *spent* needs the previous clock and the increment. Document what the
+**Clock parsing is done carefully or not at all.** `%clk` is time _remaining_, so
+deriving time _spent_ needs the previous clock and the increment. Document what the
 annotations mean and test the units before making any claim. Keep `None` rather than
 inventing zero — missing data must not distort an average.
 
@@ -386,7 +386,7 @@ If that last one fails, we improve the core — not add platforms or UI.
 
 ## Stage 12 — Optional: local HTTP API
 
-**Goal:** serve reviews over HTTP, *if the UI turns out to need it.*
+**Goal:** serve reviews over HTTP, _if the UI turns out to need it._
 
 Decide only after Stage 11, when there's a real UI with a real requirement. The
 alternatives — UI reads `review.json` directly, or a desktop wrapper — may be enough.
@@ -421,7 +421,7 @@ reviews, Stockfish packaged into the image with its NNUE identity recorded, the 
 completion guard still enforced on every input path, and enough logging to explain any
 review after the fact.
 
-SPEC §10's caution applies — *"check the terms before anything public-facing"* — and
+SPEC §10's caution applies — _"check the terms before anything public-facing"_ — and
 every hosted report must still reproduce locally from the same `review.json`.
 
 ---
@@ -434,18 +434,18 @@ where that would bite. The pristine original is preserved outside the repo.
 
 **Fixed in `SPEC.md` v2.1** — factual errors:
 
-| § | Was | Now |
-|---|---|---|
-| 7.2 | `{"type": "mate", "plies": 3}` | UCI reports mate in **moves**, not plies. `moves`, plus `winner` recorded explicitly |
+| §   | Was                                         | Now                                                                                               |
+| --- | ------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 7.2 | `{"type": "mate", "plies": 3}`              | UCI reports mate in **moves**, not plies. `moves`, plus `winner` recorded explicitly              |
 | 3.1 | reject URLs matching a live/ongoing pattern | chess.com stores finished games at `/game/live/{id}` — matching "live" rejected nearly everything |
 
 **Not changed in `SPEC.md`** — these are build scoping, and belong here:
 
-| § | Spec says | This plan does |
-|---|---|---|
-| 5.2 | 13 detectors | 6 + `engine-verified-mistake` fallback; the rest once false-positive rates are measured |
-| 5.3 | clock band as one breakdown among several | clock gets its own section — §12 says it was the clearest signal in the source games |
-| 6 | two modes, structural as fallback | verified only; structural postponed |
+| §   | Spec says                                 | This plan does                                                                          |
+| --- | ----------------------------------------- | --------------------------------------------------------------------------------------- |
+| 5.2 | 13 detectors                              | 6 + `engine-verified-mistake` fallback; the rest once false-positive rates are measured |
+| 5.3 | clock band as one breakdown among several | clock gets its own section — §12 says it was the clearest signal in the source games    |
+| 6   | two modes, structural as fallback         | verified only; structural postponed                                                     |
 
 ---
 

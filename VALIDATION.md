@@ -63,14 +63,13 @@ en passant, promotions and underpromotion have automated coverage.
 
 `review`, `validate`, and JSON-only `render` succeeded for the final batch.
 The generated report is in `review-output/acceptance-2026-09-05/report.html` and its
-coaching digest is alongside it. A full list for human review is in
-`docs/LABEL_REVIEW.md`.
+coaching digest is alongside it. Human review notes are maintained locally.
 
 **Release gate remains pending:** human semantic-label review, a useful practice
 change, and browser layout inspection. No connected browser was available;
 attempting native Safari inspection reported missing computer-use permissions.
 HTML structure and escaping passed automated checks, but that is not a screenshot
-review. See `docs/ACCEPTANCE.md`. Optional Stages 12–14 have not started.
+review. Optional Stages 12–14 have not started.
 
 `cargo build --release --locked` also passed. The optimized CLI successfully
 validated and rendered the final review. HTML inspection counted 44 complete
@@ -100,5 +99,5 @@ Formatter commands: `npm --prefix web run format` and `npm --prefix web run form
 - Built the complete Docker image locally for **Linux ARM64** using full Stockfish 18 from commit `cb3d4ee9b47d0c5aae855b12379378ea1439675c`. The image is approximately 313 MB and includes corresponding Stockfish source and networks. AMD64 is configured in the native GitHub Actions build matrix; that platform's image was not built locally.
 - Production-container smoke passed: full native engine identity, Rust API and static UI, missing-route 404s, no browser engine assets, UID 10001, read-only root with writable data volume, bundled source and healthy restart with persisted volume contents.
 - Live end-to-end check: imported **40 rated rapid games for dre4success007**, all 40 replayed through the UI's chess library, and native Stockfish completed the latest **5** games at 150,000 scan / 1,000,000 confirmation nodes. Recreated the running container mid-analysis; saved results survived unchanged and the job resumed to completion. The resulting five-game canonical review passed CLI validation and frontend conversion.
-- GitHub Actions YAML and embedded shell parsed successfully; actionlint reported **zero errors across all three workflows**. Publish and deploy are manual. No workflow was triggered, no image was pushed, and no remote deployment occurred. Server variables and SSH secrets are documented in `docs/SELF_HOSTING.md`.
+- GitHub Actions YAML and embedded shell parsed successfully; actionlint reported **zero errors across all three workflows**. Publish and deploy are manual. No workflow was triggered, no image was pushed, and no remote deployment occurred. Deployment notes are maintained locally.
 - Local Compose preview remains available at `http://localhost:8080` with the successful live review saved in the `tempo_tempo-data` volume. Browser visual/interaction QA and optional WebMCP registration remain unverified in this environment.
