@@ -140,8 +140,26 @@ mod native {
     use crate::review::atomic_write;
     use std::{
         path::{Path, PathBuf},
-        time::Duration,
+        time::{Duration, SystemTime},
     };
+    /// A month is final only when this copy was fetched after its closing day.
+    /// The extra day allows Chess.com's archive publication to settle. A copy
+    /// fetched during an active month must be refreshed, even months later.
+    pub fn archive_cache_is_finalized(month: &str, cached_at: SystemTime, now: SystemTime) -> bool {
+        let month = month.replace('-', "/");
+        let Some(final_after) =
+            chrono::NaiveDate::parse_from_str(&format!("{month}/01"), "%Y/%m/%d")
+                .ok()
+                .and_then(|date| date.checked_add_months(chrono::Months::new(1)))
+                .and_then(|date| date.succ_opt())
+                .and_then(|date| date.and_hms_opt(0, 0, 0))
+        else {
+            return false;
+        };
+        let cached_at: chrono::DateTime<chrono::Utc> = cached_at.into();
+        let now: chrono::DateTime<chrono::Utc> = now.into();
+        cached_at >= final_after.and_utc() && cached_at <= now
+    }
     pub trait Transport {
         fn get(&mut self, url: &str) -> Result<Vec<u8>, FetchError>;
     }
@@ -204,6 +222,16 @@ mod native {
             last: usize,
             current_month: &str,
         ) -> Result<Vec<ApiGame>, FetchError> {
+            self.recent_at(user, last, current_month, SystemTime::now())
+        }
+
+        pub(super) fn recent_at(
+            &mut self,
+            user: &str,
+            last: usize,
+            current_month: &str,
+            now: SystemTime,
+        ) -> Result<Vec<ApiGame>, FetchError> {
             let user = username(user)?;
             let dir = self.cache.join(&user);
             std::fs::create_dir_all(&dir)?;
@@ -227,11 +255,14 @@ mod native {
                     return Err(FetchError::Malformed("future archive".into()));
                 }
                 let path = dir.join(format!("{key}.json"));
-                let immutable = key.as_str() < current_month;
-                let existed = path.exists();
+                let immutable =
+                    key.as_str() < current_month
+                        && path.metadata().and_then(|m| m.modified()).ok().is_some_and(
+                            |cached_at| archive_cache_is_finalized(&key, cached_at, now),
+                        );
                 let bytes = self.load(&url, &path, immutable)?;
                 let month: Month = decode(&bytes)?;
-                if !self.offline && !(immutable && existed) {
+                if !self.offline && !immutable {
                     atomic_write(&path, &bytes)?;
                 }
                 for game in month.games {
@@ -322,6 +353,80 @@ mod tests {
             client.recent("a", 1, "2026-09"),
             Err(FetchError::Malformed(_))
         ));
+    }
+    fn at(value: &str) -> std::time::SystemTime {
+        chrono::DateTime::parse_from_rfc3339(value).unwrap().into()
+    }
+    #[test]
+    fn archive_finalization_requires_a_copy_fetched_after_month_end() {
+        let now = at("2026-09-10T12:00:00Z");
+        for cached_at in ["2026-08-15T12:00:00Z", "2026-09-01T23:59:59Z"] {
+            assert!(!archive_cache_is_finalized("2026/08", at(cached_at), now));
+        }
+        assert!(archive_cache_is_finalized(
+            "2026-08",
+            at("2026-09-02T00:00:00Z"),
+            now
+        ));
+        assert!(!archive_cache_is_finalized(
+            "2026/08",
+            at("2026-09-11T00:00:00Z"),
+            now
+        ));
+        assert!(archive_cache_is_finalized(
+            "2025/12",
+            at("2026-01-02T00:00:00Z"),
+            now
+        ));
+        assert!(!archive_cache_is_finalized("2026/13", now, now));
+    }
+    #[test]
+    fn online_cli_refreshes_an_active_month_snapshot_once_after_rollover() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("a")).unwrap();
+        let path = dir.path().join("a/2026-08.json");
+        let first = game();
+        let mut late = first.clone();
+        late.url = "https://www.chess.com/game/live/456".into();
+        late.end_time += 1;
+        std::fs::write(
+            &path,
+            serde_json::to_vec(&Month {
+                games: vec![first.clone()],
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        let set_time = |time| {
+            std::fs::File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_times(std::fs::FileTimes::new().set_modified(time))
+                .unwrap();
+        };
+        set_time(at("2026-08-15T12:00:00Z"));
+        let listing =
+            br#"{"archives":["https://api.chess.com/pub/player/a/games/2026/08"]}"#.to_vec();
+        let mut client = Client {
+            transport: Fake(vec![
+                listing.clone(),
+                serde_json::to_vec(&Month {
+                    games: vec![first, late],
+                })
+                .unwrap(),
+            ]),
+            cache: dir.path().into(),
+            offline: false,
+        };
+        let now = at("2026-09-10T12:00:00Z");
+        assert_eq!(client.recent_at("a", 2, "2026-09", now).unwrap().len(), 2);
+        assert!(client.transport.0.is_empty());
+        // Stamp the fetched copy with the injected clock before the next run.
+        set_time(now);
+        client.transport = Fake(vec![listing]);
+        assert_eq!(client.recent_at("a", 2, "2026-09", now).unwrap().len(), 2);
+        assert!(client.transport.0.is_empty());
     }
     #[test]
     fn untrusted_archive_urls_are_rejected() {

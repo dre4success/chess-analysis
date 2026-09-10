@@ -11,15 +11,22 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-fn load(http: &mut impl Transport, url: &str, cache: &Path, immutable: bool) -> Result<Value> {
+fn load(
+    http: &mut impl Transport,
+    url: &str,
+    cache: &Path,
+    month: Option<&str>,
+    now: SystemTime,
+) -> Result<Value> {
     let path = cache.join(format!("{}.json", bytes_sha256(url.as_bytes())));
-    let fresh = path
-        .metadata()
-        .ok()
-        .and_then(|m| m.modified().ok())
-        .and_then(|t| SystemTime::now().duration_since(t).ok())
+    let cached_at = path.metadata().ok().and_then(|m| m.modified().ok());
+    let fresh = cached_at
+        .and_then(|t| now.duration_since(t).ok())
         .is_some_and(|age| age < Duration::from_secs(120));
-    if (immutable || fresh) && path.is_file() {
+    let finalized = month
+        .zip(cached_at)
+        .is_some_and(|(month, cached_at)| fetch::archive_cache_is_finalized(month, cached_at, now));
+    if (finalized || fresh) && path.is_file() {
         return Ok(serde_json::from_slice(&std::fs::read(path)?)?);
     }
     let bytes = http.get(url)?;
@@ -35,7 +42,14 @@ pub fn player(
     cancelled: impl Fn() -> bool,
 ) -> Result<PlayerData> {
     std::fs::create_dir_all(cache)?;
-    import(&mut Http::new(user), user, pace, cache, cancelled)
+    import(
+        &mut Http::new(user),
+        user,
+        pace,
+        cache,
+        SystemTime::now(),
+        cancelled,
+    )
 }
 
 fn import(
@@ -43,10 +57,11 @@ fn import(
     user: &str,
     pace: &str,
     cache: &Path,
+    now: SystemTime,
     cancelled: impl Fn() -> bool,
 ) -> Result<PlayerData> {
     let base = format!("https://api.chess.com/pub/player/{user}");
-    let listing = load(http, &format!("{base}/games/archives"), cache, false)?;
+    let listing = load(http, &format!("{base}/games/archives"), cache, None, now)?;
     let archives = listing["archives"]
         .as_array()
         .ok_or("Chess.com returned an invalid archive list")?;
@@ -71,7 +86,14 @@ fn import(
     }
     months.sort();
     months.dedup();
-    let current = chrono::Utc::now().format("%Y/%m").to_string();
+    let now_utc: chrono::DateTime<chrono::Utc> = now.into();
+    let current = now_utc.format("%Y/%m").to_string();
+    if months
+        .iter()
+        .any(|url| &url[prefix.len()..] > current.as_str())
+    {
+        return Err("Chess.com returned a future archive month".into());
+    }
     let mut games = Vec::new();
     let mut seen = HashSet::new();
     let mut read = 0;
@@ -81,7 +103,7 @@ fn import(
             return Err("review cancelled".into());
         }
         let month = &url[prefix.len()..];
-        let archive = load(http, url, cache, month < current.as_str())?;
+        let archive = load(http, url, cache, Some(month), now)?;
         read += 1;
         for raw in archive["games"]
             .as_array()
@@ -100,7 +122,7 @@ fn import(
                 skipped += 1;
                 continue;
             }
-            let Ok(completed) = fetch::verify(&game, chrono::Utc::now().timestamp()) else {
+            let Ok(completed) = fetch::verify(&game, now_utc.timestamp()) else {
                 skipped += 1;
                 continue;
             };
@@ -121,7 +143,7 @@ fn import(
     let profile = if cancelled() {
         json!({"username":user})
     } else {
-        load(http, &base, cache, false)
+        load(http, &base, cache, None, now)
             .ok()
             .map(|v| json!({"username":user,"name":v["name"].as_str()}))
             .unwrap_or_else(|| json!({"username":user}))
@@ -130,7 +152,7 @@ fn import(
         profile,
         games,
         pace: pace.into(),
-        fetched_at: chrono::Utc::now().to_rfc3339(),
+        fetched_at: now_utc.to_rfc3339(),
         archives_read: read,
         warning: (skipped > 0).then(|| {
             format!(
@@ -144,6 +166,44 @@ fn import(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn historical_cache_refreshes_after_rollover_then_reuses_the_final_copy() {
+        struct UpdatedArchive(usize);
+        impl Transport for UpdatedArchive {
+            fn get(&mut self, _: &str) -> std::result::Result<Vec<u8>, fetch::FetchError> {
+                self.0 += 1;
+                Ok(br#"{"games":["early","late"]}"#.to_vec())
+            }
+        }
+        let at = |s| -> SystemTime { chrono::DateTime::parse_from_rfc3339(s).unwrap().into() };
+        let dir = tempfile::tempdir().unwrap();
+        let url = "https://api.chess.com/pub/player/dre/games/2026/08";
+        let path = dir
+            .path()
+            .join(format!("{}.json", bytes_sha256(url.as_bytes())));
+        std::fs::write(&path, br#"{"games":["early"]}"#).unwrap();
+        let set_time = |time| {
+            std::fs::File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_times(std::fs::FileTimes::new().set_modified(time))
+                .unwrap();
+        };
+        set_time(at("2026-08-15T12:00:00Z"));
+        let now = at("2026-09-10T12:00:00Z");
+        let mut http = UpdatedArchive(0);
+        let value = load(&mut http, url, dir.path(), Some("2026/08"), now).unwrap();
+        assert_eq!(value["games"].as_array().unwrap().len(), 2);
+        assert_eq!(http.0, 1);
+        set_time(now);
+        let later = now + Duration::from_secs(3600);
+        assert_eq!(
+            load(&mut http, url, dir.path(), Some("2026/08"), later).unwrap(),
+            value
+        );
+        assert_eq!(http.0, 1);
+    }
     struct HttpFixture {
         requests: Vec<String>,
         listing: Value,
@@ -179,7 +239,15 @@ mod tests {
             listing: json!({"archives":["https://api.chess.com/pub/player/dre4success007/games/2026/08"]}),
             archive,
         };
-        let data = import(&mut http, "dre4success007", "rapid", dir.path(), || false).unwrap();
+        let data = import(
+            &mut http,
+            "dre4success007",
+            "rapid",
+            dir.path(),
+            SystemTime::now(),
+            || false,
+        )
+        .unwrap();
         assert_eq!(data.games.len(), 12);
         assert_eq!(data.skipped, 1);
         assert_eq!(data.archives_read, 1);
@@ -190,10 +258,17 @@ mod tests {
         );
         let count = http.requests.len();
         assert_eq!(
-            import(&mut http, "dre4success007", "rapid", dir.path(), || false)
-                .unwrap()
-                .games
-                .len(),
+            import(
+                &mut http,
+                "dre4success007",
+                "rapid",
+                dir.path(),
+                SystemTime::now(),
+                || false
+            )
+            .unwrap()
+            .games
+            .len(),
             12
         );
         assert_eq!(http.requests.len(), count);
@@ -212,7 +287,17 @@ mod tests {
                 listing: json!({"archives":[url]}),
                 archive: json!({}),
             };
-            assert!(import(&mut http, "dre", "rapid", dir.path(), || false).is_err());
+            assert!(
+                import(
+                    &mut http,
+                    "dre",
+                    "rapid",
+                    dir.path(),
+                    SystemTime::now(),
+                    || false
+                )
+                .is_err()
+            );
             assert_eq!(http.requests.len(), 1);
         }
         let dir = tempfile::tempdir().unwrap();
@@ -221,7 +306,17 @@ mod tests {
             listing: json!({"archives":["https://api.chess.com/pub/player/dre/games/2026/08"]}),
             archive: json!({}),
         };
-        assert!(import(&mut http, "dre", "rapid", dir.path(), || true).is_err());
+        assert!(
+            import(
+                &mut http,
+                "dre",
+                "rapid",
+                dir.path(),
+                SystemTime::now(),
+                || true
+            )
+            .is_err()
+        );
         assert_eq!(http.requests.len(), 1);
     }
 }

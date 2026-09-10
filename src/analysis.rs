@@ -1,6 +1,6 @@
 use crate::{
     completion::CompletedGame,
-    engine::{Analysis, EngineError, Nodes, PositionEngine},
+    engine::{Analysis, EngineError, Nodes, PositionEngine, SearchContext},
     evaluation::{Evaluation, ReviewSide},
     review::legal_move,
 };
@@ -161,10 +161,30 @@ pub fn candidates(
         let terminal_after = terminal(&position, user)
             .or_else(|| (automatic_draw || claimed_draw).then_some(Evaluation::centipawns(0)));
         if before.turn() == user {
-            let best = engine.analyse(&before, user, config.scan)?;
+            let best = engine.analyse_with_history(
+                SearchContext {
+                    position: &before,
+                    initial: game.initial_position(),
+                    moves: &game.moves()[..index],
+                },
+                user,
+                config.scan,
+            )?;
             let eval_after = match terminal_after {
                 Some(e) => e,
-                None => engine.analyse(&position, user, config.scan)?.evaluation,
+                None => {
+                    engine
+                        .analyse_with_history(
+                            SearchContext {
+                                position: &position,
+                                initial: game.initial_position(),
+                                moves: &game.moves()[..=index],
+                            },
+                            user,
+                            config.scan,
+                        )?
+                        .evaluation
+                }
             };
             if loss(best.evaluation, eval_after) >= u64::from((config.threshold_cp / 2).max(1)) {
                 shortlist.push((
@@ -181,11 +201,27 @@ pub fn candidates(
     }
     let mut confirmed = Vec::new();
     for (index, before, after, previous, actual, terminal_after) in shortlist {
-        let best = engine.analyse(&before, user, config.deep)?;
+        let best = engine.analyse_with_history(
+            SearchContext {
+                position: &before,
+                initial: game.initial_position(),
+                moves: &game.moves()[..index],
+            },
+            user,
+            config.deep,
+        )?;
         let (eval_after, reply) = match terminal_after {
             Some(e) => (e, None),
             None => {
-                let reply = engine.analyse(&after, user, config.deep)?;
+                let reply = engine.analyse_with_history(
+                    SearchContext {
+                        position: &after,
+                        initial: game.initial_position(),
+                        moves: &game.moves()[..=index],
+                    },
+                    user,
+                    config.deep,
+                )?;
                 (reply.evaluation, Some(reply))
             }
         };
@@ -322,6 +358,55 @@ mod tests {
         }
         let findings = candidates(&game, Color::Black, &mut engine, config).unwrap();
         assert!(findings.iter().all(|c| c.ply != 54));
+    }
+    #[test]
+    #[ignore = "requires STOCKFISH; repetition history and causal explanation regressions"]
+    fn available_repetition_and_harmless_ray_are_reviewed_correctly() {
+        let config = AnalysisConfig::default();
+        let path = std::env::var("STOCKFISH").unwrap();
+        let (mut engine, _) = crate::stockfish::open(
+            std::path::Path::new(&path),
+            config.scan,
+            config.deep,
+            std::time::Duration::from_secs(60),
+        )
+        .unwrap();
+        let repetition = LocalPgnPolicy
+            .verify(
+                crate::pgn::parse_one(include_bytes!("../tests/fixtures/repetition-draw.pgn"))
+                    .unwrap()
+                    .unwrap(),
+            )
+            .unwrap();
+        let findings = findings(&repetition, Color::Black, &mut engine, config).unwrap();
+        let lost_draw = findings
+            .iter()
+            .find(|f| f.ply == 8)
+            .expect("declining the available draw must be found");
+        assert_eq!(lost_draw.best_uci.as_deref(), Some("f8g8"));
+        assert_eq!(lost_draw.eval_before, Evaluation::centipawns(0));
+        assert!(loss(lost_draw.eval_before, lost_draw.eval_after) >= 200);
+        assert!(!lost_draw.refutation_variation_uci.is_empty());
+        let ray = LocalPgnPolicy
+            .verify(
+                crate::pgn::parse_one(include_bytes!("../tests/fixtures/harmless-ray.pgn"))
+                    .unwrap()
+                    .unwrap(),
+            )
+            .unwrap();
+        let findings = super::findings(&ray, Color::Black, &mut engine, config).unwrap();
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].classification,
+            crate::review::Classification::LineOnto
+        );
+        assert_eq!(
+            findings[0]
+                .refutation_variation_uci
+                .first()
+                .map(String::as_str),
+            Some("d3e4")
+        );
     }
     #[test]
     fn scan_shortlists_but_only_deep_search_decides() {

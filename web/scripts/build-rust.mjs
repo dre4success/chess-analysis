@@ -9,7 +9,9 @@ const output = path.join(webRoot, 'public/rust');
 await mkdir(output, { recursive: true });
 let repo = path.resolve(webRoot, '..');
 function run(command, args, cwd) {
-  const result = spawnSync(command, args, { cwd, stdio: 'inherit' });
+  // macOS tar otherwise adds AppleDouble files containing local file metadata.
+  const env = command === 'tar' ? { ...process.env, COPYFILE_DISABLE: '1' } : process.env;
+  const result = spawnSync(command, args, { cwd, stdio: 'inherit', env });
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 try {

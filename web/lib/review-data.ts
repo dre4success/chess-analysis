@@ -16,12 +16,34 @@ export type RustFinding = {
   classification: string;
   explanation: string;
   principal_variation_uci: string[];
+  refutation_variation_uci?: string[];
   clock_secs?: number;
+};
+export type ReviewPattern = {
+  classification: string;
+  games_affected: number;
+  games_reviewed: number;
+  occurrences: number;
+  example_refs: { url: string; ply: number }[];
+  breakdowns: {
+    dimension: string;
+    value: string;
+    games_affected: number;
+    games_reviewed: number;
+    occurrences: number;
+  }[];
 };
 export type SavedReview = {
   user: string;
   generated: string;
-  games: { url: string; findings: RustFinding[] }[];
+  games: {
+    url: string;
+    findings: RustFinding[];
+    clock_used_pct?: number;
+    phase_coverage?: string[];
+    clock_band_coverage?: string[];
+  }[];
+  patterns?: ReviewPattern[];
 };
 function convertEval(e: RustEval): Eval {
   return e.type === 'cp'
@@ -38,12 +60,19 @@ const titles: Record<string, string> = {
   'engine-verified-mistake': 'A stronger move was available',
 };
 export function convertFinding(f: RustFinding): Finding {
-  const c = new Chess(f.before_fen),
-    pv = [];
-  for (const u of f.principal_variation_uci.slice(0, 10)) {
-    const m = c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
-    pv.push(m.san);
+  function notation(fen: string, moves: string[]) {
+    const c = new Chess(fen),
+      pv = [];
+    for (const u of moves) {
+      const m = c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
+      pv.push(m.san);
+    }
+    return pv;
   }
+  const missedMate =
+    f.eval_before.type === 'mate' &&
+    f.eval_before.winner === 'user' &&
+    f.eval_after.type === 'cp';
   return {
     ply: f.ply,
     beforeFen: f.before_fen,
@@ -51,17 +80,24 @@ export function convertFinding(f: RustFinding): Finding {
     actual: f.actual_san,
     best: f.best_san,
     bestUci: f.best_uci,
+    classification: f.classification,
+    clockSecs: f.clock_secs,
     before: convertEval(f.eval_before),
     after: convertEval(f.eval_after),
     loss:
       f.eval_before.type === 'cp' && f.eval_after.type === 'cp'
         ? f.eval_before.value - f.eval_after.value
         : null,
-    title: titles[f.classification] ?? 'A moment to review',
+    title: missedMate
+      ? 'A mating opportunity'
+      : (titles[f.classification] ?? 'A moment to review'),
     explanation:
       f.classification === 'engine-verified-mistake'
-        ? `Stockfish prefers ${f.best_san} to ${f.actual_san}. Replay the alternative to see how the position changes.`
+        ? missedMate
+          ? `${f.best_san} keeps a forced mate. After ${f.actual_san}, that mating opportunity is gone. Follow the better line to see the forcing moves.`
+          : `Stockfish prefers ${f.best_san} to ${f.actual_san}. Replay the alternative to see how the position changes.`
         : f.explanation,
-    pv,
+    pv: notation(f.before_fen, f.principal_variation_uci),
+    refutationPv: notation(f.after_fen, f.refutation_variation_uci ?? []),
   };
 }

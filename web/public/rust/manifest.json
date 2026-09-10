@@ -3,6 +3,6 @@
   "scanNodes": 150000,
   "confirmationNodes": 1000000,
   "thresholdCp": 200,
-  "sha256": "1033201b81e81d4563ad4ec3a60355172504878d336c68cd38691d1960f3b74a",
-  "sourceSha256": "2bd5626db077a7ac9b0a45ad514ad3db80640bb71456ed85a2b42ebd8c7adfba"
+  "sha256": "ea8376c632b08a87d80dbfc20ff6de8b2f37de55d428162610786044ababc4a7",
+  "sourceSha256": "f28e57457d919675ae37523ee0af287fc02c4677771d5c84bc4f13c9258dc1bd"
 }

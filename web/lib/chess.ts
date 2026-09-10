@@ -56,6 +56,9 @@ export type Finding = {
   title: string;
   explanation: string;
   pv: string[];
+  classification?: string;
+  refutationPv?: string[];
+  clockSecs?: number;
 };
 export type GameAnalysis = {
   id: string;
@@ -235,7 +238,7 @@ export function summarise(games: Game[]) {
     wins,
     draw,
     loss: games.length - wins - draw,
-    winRate: games.length ? Math.round((wins / games.length) * 100) : 0,
+    winRate: games.length ? Math.round((wins * 100) / games.length) : 0,
     rating: games[0]?.rating ?? null,
     change: games.length > 1 ? games[0].rating - games.at(-1)!.rating : null,
     openings,

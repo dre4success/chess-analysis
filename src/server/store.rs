@@ -1,6 +1,6 @@
 use super::{Job, Result};
 use crate::review::GameReview;
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, params, params_from_iter, types::Value};
 use std::{path::Path, sync::Mutex};
 
 pub struct Store(Mutex<Connection>);
@@ -97,16 +97,59 @@ impl Store {
             .transpose()
     }
 
-    pub fn recent(&self) -> Result<Vec<Job>> {
+    pub fn history(
+        &self,
+        usernames: &[String],
+        offset: i64,
+        limit: i64,
+    ) -> Result<(Vec<Job>, i64)> {
+        if usernames.is_empty() {
+            return Ok((Vec::new(), 0));
+        }
         let db = self.0.lock().map_err(|_| "database lock poisoned")?;
+        let filter = format!("username IN ({})", vec!["?"; usernames.len()].join(","));
+        let mut parameters: Vec<Value> = usernames.iter().cloned().map(Value::from).collect();
+        let total = db.query_row(
+            &format!("SELECT count(*) FROM jobs WHERE {filter}"),
+            params_from_iter(&parameters),
+            |row| row.get(0),
+        )?;
+        parameters.extend([Value::from(limit), Value::from(offset)]);
         let snapshots = db
-            .prepare("SELECT snapshot FROM jobs ORDER BY id DESC LIMIT 8")?
-            .query_map([], |row| row.get::<_, String>(0))?
+            .prepare(&format!(
+                "SELECT snapshot FROM jobs WHERE {filter} ORDER BY id DESC LIMIT ? OFFSET ?"
+            ))?
+            .query_map(params_from_iter(&parameters), |row| row.get::<_, String>(0))?
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        snapshots
+        let jobs = snapshots
             .iter()
             .map(|s| serde_json::from_str(s).map_err(Into::into))
-            .collect()
+            .collect::<Result<Vec<Job>>>()?;
+        Ok((jobs, total))
+    }
+
+    pub fn queue_status(&self) -> Result<serde_json::Value> {
+        let db = self.0.lock().map_err(|_| "database lock poisoned")?;
+        let (queued, running, failed, current_job): (i64, i64, i64, Option<i64>) = db.query_row(
+            "SELECT coalesce(sum(status='queued'),0), coalesce(sum(status='running'),0),
+                    coalesce(sum(status='failed'),0), min(CASE WHEN status='running' THEN id END)
+             FROM jobs",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )?;
+        let last_error: Option<String> = db
+            .query_row(
+                "SELECT json_extract(snapshot,'$.error') FROM jobs
+             WHERE status='failed' ORDER BY id DESC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?
+            .flatten();
+        Ok(serde_json::json!({
+            "queued": queued, "running": running, "failed": failed,
+            "current_job": current_job, "last_error": last_error,
+        }))
     }
 
     pub fn next(&self) -> Result<Option<Job>> {

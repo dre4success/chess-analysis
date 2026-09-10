@@ -2,7 +2,7 @@ import type { RustFinding } from './review-data.ts';
 export { convertFinding } from './review-data.ts';
 export type { RustEval, RustFinding, SavedReview } from './review-data.ts';
 export type RustStep = {
-  requests: { fen: string; nodes: number }[];
+  requests: { fen: string; nodes: number; position_command?: string }[];
   findings: RustFinding[];
   positions: number;
   error?: string;

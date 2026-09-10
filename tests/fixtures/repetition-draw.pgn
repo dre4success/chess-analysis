@@ -1,0 +1,7 @@
+[White "Opponent"]
+[Black "alice"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "6k1/8/8/8/8/8/8/R5K1 w - - 0 1"]
+
+1. Kf1 Kf8 2. Kg1 Kg8 3. Kf1 Kf8 4. Kg1 Ke7 1-0

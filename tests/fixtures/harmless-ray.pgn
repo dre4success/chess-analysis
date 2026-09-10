@@ -1,0 +1,7 @@
+[White "Opponent"]
+[Black "alice"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "5k2/4p1p1/5n2/8/7B/3P4/8/4K3 b - - 0 1"]
+
+1... Ne4 1-0

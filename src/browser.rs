@@ -5,7 +5,7 @@
 use crate::{
     analysis::{self, AnalysisConfig},
     completion::CompletedGame,
-    engine::{Analysis, EngineError, Nodes, PositionEngine, parse_info},
+    engine::{Analysis, EngineError, Nodes, PositionEngine, SearchContext, parse_info},
     evaluation::Evaluation,
     fetch::{self, ApiGame},
     review::{Finding, legal_move},
@@ -17,11 +17,13 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Serialize)]
 pub struct SearchRequest {
     pub fen: String,
+    pub position_command: String,
     pub nodes: u64,
 }
 #[derive(Debug, Deserialize)]
 pub struct SearchResponse {
     pub fen: String,
+    pub position_command: String,
     pub nodes: u64,
     pub info: String,
     pub final_best: String,
@@ -66,12 +68,12 @@ impl BrowserReview {
         }
         let mut validated = BTreeMap::new();
         for response in responses {
-            let key = (response.fen.clone(), response.nodes);
-            if !self
-                .pending
-                .iter()
-                .any(|r| r.fen == response.fen && r.nodes == response.nodes)
-                || validated.contains_key(&key)
+            let key = (response.position_command.clone(), response.nodes);
+            if !self.pending.iter().any(|r| {
+                r.fen == response.fen
+                    && r.nodes == response.nodes
+                    && r.position_command == response.position_command
+            }) || validated.contains_key(&key)
             {
                 return Err("unexpected or duplicate search response".into());
             }
@@ -142,11 +144,29 @@ impl PositionEngine for CachedEngine<'_> {
     fn analyse(
         &mut self,
         position: &Chess,
+        user: Color,
+        nodes: Nodes,
+    ) -> Result<Analysis, EngineError> {
+        self.analyse_with_history(
+            SearchContext {
+                position,
+                initial: position,
+                moves: &[],
+            },
+            user,
+            nodes,
+        )
+    }
+    fn analyse_with_history(
+        &mut self,
+        context: SearchContext<'_>,
         _: Color,
         nodes: Nodes,
     ) -> Result<Analysis, EngineError> {
+        let position = context.position;
         let fen = Fen::from_position(position, EnPassantMode::Legal).to_string();
-        let key = (fen.clone(), nodes.get());
+        let position_command = context.position_command();
+        let key = (position_command.clone(), nodes.get());
         if let Some(analysis) = self.cache.get(&key) {
             return Ok(analysis.clone());
         }
@@ -154,6 +174,7 @@ impl PositionEngine for CachedEngine<'_> {
             key,
             SearchRequest {
                 fen,
+                position_command,
                 nodes: nodes.get(),
             },
         );
@@ -262,7 +283,52 @@ mod tests {
         assert!(!first.requests.is_empty());
         assert!(first.findings.is_empty());
         assert!(first.requests.iter().all(|r| r.nodes == 150_000));
+        assert!(
+            first
+                .requests
+                .iter()
+                .any(|r| r.position_command.contains(" moves "))
+        );
         assert!(review.step(vec![]).is_err());
+    }
+    #[test]
+    fn cache_distinguishes_histories_that_reach_the_same_fen() {
+        let initial = Chess::default();
+        let sequences: Vec<Vec<shakmaty::uci::UciMove>> =
+            ["g1f3 g8f6 b1c3 b8c6", "b1c3 b8c6 g1f3 g8f6"]
+                .into_iter()
+                .map(|s| s.split_whitespace().map(|m| m.parse().unwrap()).collect())
+                .collect();
+        let positions: Vec<_> = sequences
+            .iter()
+            .map(|moves| {
+                let mut p = initial.clone();
+                for mv in moves {
+                    p.play_unchecked(mv.to_move(&p).unwrap());
+                }
+                p
+            })
+            .collect();
+        assert_eq!(positions[0], positions[1]);
+        let cache = BTreeMap::new();
+        let mut engine = CachedEngine {
+            cache: &cache,
+            missing: BTreeMap::new(),
+        };
+        for (position, moves) in positions.iter().zip(&sequences) {
+            engine
+                .analyse_with_history(
+                    SearchContext {
+                        position,
+                        initial: &initial,
+                        moves,
+                    },
+                    Color::White,
+                    Nodes::new(150_000).unwrap(),
+                )
+                .unwrap();
+        }
+        assert_eq!(engine.missing.len(), 2);
     }
     #[test]
     fn cached_browser_adapter_matches_native_pipeline() {
@@ -305,6 +371,7 @@ mod tests {
                         .to_string();
                     SearchResponse {
                         fen: r.fen,
+                        position_command: r.position_command,
                         nodes: r.nodes,
                         info: format!("info score cp 0 pv {mv}"),
                         final_best: mv,

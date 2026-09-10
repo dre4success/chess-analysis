@@ -22,7 +22,7 @@ export function exactInfo(line: string): Omit<SearchResult, 'finalBest' | 'info'
   };
 }
 export interface PositionEngine {
-  search(fen: string, nodes: number): Promise<SearchResult>;
+  search(fen: string, nodes: number, positionCommand?: string): Promise<SearchResult>;
   close(): void;
 }
 export class BrowserEngine implements PositionEngine {
@@ -81,10 +81,14 @@ export class BrowserEngine implements PositionEngine {
     this.worker.postMessage('setoption name MultiPV value 1');
     await this.command('isready', (line) => line === 'readyok');
   }
-  async search(fen: string, nodes: number): Promise<SearchResult> {
+  async search(
+    fen: string,
+    nodes: number,
+    positionCommand?: string,
+  ): Promise<SearchResult> {
     this.worker.postMessage('setoption name Clear Hash');
     await this.command('isready', (line) => line === 'readyok');
-    this.worker.postMessage(`position fen ${fen}`);
+    this.worker.postMessage(positionCommand ?? `position fen ${fen}`);
     let exact: ReturnType<typeof exactInfo> = null;
     let finalBest = '',
       infoLine = '';
@@ -142,10 +146,11 @@ export async function analyseGame(
     for (let i = 0; i < step.requests.length; i++) {
       if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
       const req = step.requests[i],
-        result = await engine.search(req.fen, req.nodes);
+        result = await engine.search(req.fen, req.nodes, req.position_command);
       responses.push({
         fen: req.fen,
         nodes: req.nodes,
+        position_command: req.position_command,
         info: result.info,
         final_best: result.finalBest,
       });

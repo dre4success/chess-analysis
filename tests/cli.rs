@@ -46,7 +46,9 @@ for line in sys.stdin:
   print('option name Clear Hash type button')
   print('uciok',flush=True)
  elif line=='isready': print('readyok',flush=True)
- elif line.startswith('position fen '): white=' w ' in line
+ elif line.startswith('position fen '):
+  white=' w ' in line
+  if ' moves ' in line and len(line.split(' moves ',1)[1].split()) % 2: white=not white
  elif line.startswith('go '):
   move='d2d4' if white else 'e7e5'
   print('info score cp '+('0' if white else '400')+' pv '+move,flush=True)
@@ -78,6 +80,10 @@ for line in sys.stdin:
     assert!(html.contains("&lt;script&gt;"));
     let review = chess_review::review::read(&json).unwrap();
     assert_eq!(review.as_review().games[0].findings.len(), 1);
+    assert_eq!(
+        review.as_review().games[0].findings[0].refutation_variation_uci,
+        vec!["e7e5"]
+    );
     assert_eq!(
         std::fs::read_to_string(out.join("digest.md")).unwrap(),
         chess_review::render::digest(&review)

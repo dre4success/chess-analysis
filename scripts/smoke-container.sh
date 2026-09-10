@@ -2,6 +2,9 @@
 # Run the production image with an isolated volume and an ephemeral local port.
 set -euo pipefail
 image="${1:-tempo:local}"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+fixture="$script_dir/../tests/fixtures/smoke.pgn"
+test -s "$fixture"
 name="tempo-smoke-$$"
 volume="$name-data"
 cleanup() {
@@ -68,10 +71,35 @@ print('Container smoke passed: native Stockfish 18, Rust API, UI and lazy chart 
 PY
 test "$(docker exec "$name" id -u)" = 10001
 docker exec "$name" test -s /usr/share/stockfish/source.tar.gz
+# Exercise the packaged analysis pipeline without Chess.com or another service.
+# Fixed node budgets keep this short and reproducible on both native platforms.
+docker exec -i "$name" sh -c 'cat > /tmp/tempo-smoke.pgn' < "$fixture"
+docker exec "$name" chess-review review tempo-smoke \
+  --pgn /tmp/tempo-smoke.pgn --offline --last 1 \
+  --engine /usr/local/bin/stockfish --output /data/native-smoke \
+  --scan-nodes 10000 --deep-nodes 50000 --timeout-secs 20
+docker exec "$name" chess-review validate /data/native-smoke/review.json
+docker exec "$name" cat /data/native-smoke/review.json | python3 -c '
+import json, sys
+review = json.load(sys.stdin)
+assert review["mode"] == "verified" and review["user"] == "tempo-smoke"
+assert review["engine"]["version"].startswith("Stockfish 18")
+assert review["engine"]["scan_nodes"] == 10000
+assert review["engine"]["deep_nodes"] == 50000
+assert len(review["games"]) == 1
+game = review["games"][0]
+assert game["result"] == "loss"
+assert any(f["ply"] == 3 for f in game["findings"]), "The forced-mate mistake must be reviewed"
+print("Offline native review passed: completed game, forced-mate finding and validated legal evidence.")
+'
+docker exec "$name" chess-review render /data/native-smoke/review.json
+docker exec "$name" test -s /data/native-smoke/digest.md
+docker exec "$name" test -s /data/native-smoke/report.html
 docker exec "$name" sh -c 'printf "durable\n" > /data/smoke.txt'
 docker restart --time 90 "$name" >/dev/null
 port="$(docker port "$name" 8080/tcp | head -n 1 | cut -d: -f2)"
 base="http://127.0.0.1:$port"
 test "$(docker exec "$name" cat /data/smoke.txt)" = durable
+docker exec "$name" chess-review validate /data/native-smoke/review.json
 curl --fail --retry 15 --retry-connrefused --retry-all-errors --retry-delay 1 --silent "$base/api/health" >/dev/null
 echo 'Non-root runtime, bundled Stockfish source and container restart passed.'

@@ -3,7 +3,7 @@ use crate::{
     evaluation::{Evaluation, ReviewSide},
     review::legal_move,
 };
-use shakmaty::{Chess, Color, EnPassantMode, Position, fen::Fen};
+use shakmaty::{Chess, Color, EnPassantMode, Position, fen::Fen, uci::UciMove};
 use std::{
     collections::BTreeMap,
     io::{BufRead, BufReader, Write},
@@ -48,6 +48,29 @@ pub struct Analysis {
     pub final_best_uci: String,
     pub pv: Vec<String>,
 }
+/// A position together with the actual game history needed for repetition rules.
+#[derive(Debug, Clone, Copy)]
+pub struct SearchContext<'a> {
+    pub position: &'a Chess,
+    pub initial: &'a Chess,
+    pub moves: &'a [UciMove],
+}
+impl SearchContext<'_> {
+    pub fn position_command(self) -> String {
+        let mut command = format!(
+            "position fen {}",
+            Fen::from_position(self.initial, EnPassantMode::Legal)
+        );
+        if !self.moves.is_empty() {
+            command.push_str(" moves");
+            for mv in self.moves {
+                command.push(' ');
+                command.push_str(&mv.to_string());
+            }
+        }
+        command
+    }
+}
 pub trait PositionEngine {
     fn analyse(
         &mut self,
@@ -55,6 +78,15 @@ pub trait PositionEngine {
         user: Color,
         nodes: Nodes,
     ) -> Result<Analysis, EngineError>;
+
+    fn analyse_with_history(
+        &mut self,
+        context: SearchContext<'_>,
+        user: Color,
+        nodes: Nodes,
+    ) -> Result<Analysis, EngineError> {
+        self.analyse(context.position, user, nodes)
+    }
 }
 pub struct UciEngine {
     child: Child,
@@ -187,6 +219,7 @@ impl UciEngine {
     fn search(
         &mut self,
         position: &Chess,
+        position_command: &str,
         user: Color,
         nodes: Nodes,
     ) -> Result<Analysis, EngineError> {
@@ -195,10 +228,7 @@ impl UciEngine {
         }
         self.send("setoption name Clear Hash")?;
         self.ready()?;
-        self.send(&format!(
-            "position fen {}",
-            Fen::from_position(position, EnPassantMode::Legal)
-        ))?;
+        self.send(position_command)?;
         self.send(&format!("go nodes {}", nodes.get()))?;
         let deadline = Instant::now() + self.timeout;
         let mut latest = None;
@@ -255,7 +285,23 @@ impl PositionEngine for UciEngine {
         user: Color,
         nodes: Nodes,
     ) -> Result<Analysis, EngineError> {
-        let result = self.search(position, user, nodes);
+        self.analyse_with_history(
+            SearchContext {
+                position,
+                initial: position,
+                moves: &[],
+            },
+            user,
+            nodes,
+        )
+    }
+    fn analyse_with_history(
+        &mut self,
+        context: SearchContext<'_>,
+        user: Color,
+        nodes: Nodes,
+    ) -> Result<Analysis, EngineError> {
+        let result = self.search(context.position, &context.position_command(), user, nodes);
         if result.is_err() {
             self.shutdown();
         }
@@ -353,8 +399,34 @@ mod tests {
     #[cfg(unix)]
     fn fake(body: &str) -> UciEngine {
         let mut cmd = Command::new("python3");
-        cmd.args(["-u", "-c", &format!("import sys,time\nfor line in sys.stdin:\n line=line.strip()\n if line=='uci': print('uciok',flush=True)\n elif line=='isready': print('readyok',flush=True)\n elif line=='quit': break\n elif line.startswith('go '):\n  {body}\n")]);
+        cmd.args(["-u", "-c", &format!("import sys,time\nfor line in sys.stdin:\n line=line.strip()\n if line=='uci': print('uciok',flush=True)\n elif line=='isready': print('readyok',flush=True)\n elif line=='quit': break\n elif line.startswith('position '): position=line\n elif line.startswith('go '):\n  {body}\n")]);
         UciEngine::command(cmd, Duration::from_millis(500)).unwrap()
+    }
+    #[test]
+    #[cfg(unix)]
+    fn history_is_sent_to_uci_and_pv_is_checked_at_the_current_position() {
+        let initial = Chess::default();
+        let moves: Vec<UciMove> = vec!["e2e4".parse().unwrap()];
+        let position = initial
+            .clone()
+            .play(moves[0].to_move(&initial).unwrap())
+            .unwrap();
+        let mut engine = fake(
+            "assert position.endswith(' moves e2e4'), position; print('info score cp 20 pv e7e5',flush=True); print('bestmove e7e5',flush=True)",
+        );
+        let result = engine
+            .analyse_with_history(
+                SearchContext {
+                    position: &position,
+                    initial: &initial,
+                    moves: &moves,
+                },
+                Color::White,
+                Nodes::new(100).unwrap(),
+            )
+            .unwrap();
+        assert_eq!(result.evaluation, Evaluation::centipawns(-20));
+        assert_eq!(result.pv, vec!["e7e5"]);
     }
     #[test]
     #[cfg(unix)]

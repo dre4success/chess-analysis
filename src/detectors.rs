@@ -37,6 +37,7 @@ pub fn line_opened(ctx: &MoveContext<'_>) -> Option<ClassificationEvidence> {
                 Some(Role::Bishop | Role::Rook | Role::Queen)
             ) && attacks::between(attacker, victim).contains(from)
                 && !ctx.before.board().attacks_from(attacker).contains(victim)
+                && exchange_gain(ctx.after, victim) > 0
             {
                 return Some(evidence(
                     Classification::LineOpened,
@@ -103,6 +104,39 @@ mod tests {
         );
         assert!(probe(fen, "b2a4").is_none());
         assert!(probe("4k3/8/5n2/8/7B/8/8/4K3 b - - 0 1", "f6e4").is_none());
+    }
+    #[test]
+    fn harmless_ray_does_not_override_hanging_the_moved_knight() {
+        use crate::{analysis::Candidate, engine::Analysis, evaluation::Evaluation};
+        let before = position("5k2/4p1p1/5n2/8/7B/3P4/8/4K3 b - - 0 1");
+        let actual = crate::review::legal_move(&before, "f6e4").unwrap();
+        let after = before.clone().play(actual).unwrap();
+        assert_eq!(exchange_gain(&after, Square::E7), 0);
+        assert_eq!(exchange_gain(&after, Square::E4), 320);
+        let finding = classify(&Candidate {
+            ply: 1,
+            before,
+            after,
+            previous: None,
+            actual,
+            best: Analysis {
+                evaluation: Evaluation::centipawns(47),
+                best_uci: "f8f7".into(),
+                final_best_uci: "f8f7".into(),
+                pv: vec!["f8f7".into()],
+            },
+            reply: Some(Analysis {
+                evaluation: Evaluation::centipawns(-515),
+                best_uci: "d3e4".into(),
+                final_best_uci: "d3e4".into(),
+                pv: vec!["d3e4".into()],
+            }),
+            eval_after: Evaluation::centipawns(-515),
+            severity: 562,
+        });
+        assert_eq!(finding.classification, Classification::LineOnto);
+        assert!(!finding.also_matched.contains(&Classification::LineOpened));
+        assert_eq!(finding.refutation_variation_uci, vec!["d3e4"]);
     }
 }
 
@@ -317,6 +351,11 @@ pub(crate) fn classify(candidate: &crate::analysis::Candidate) -> crate::review:
         explanation: primary.explanation,
         also_matched: matches.into_iter().map(|m| m.classification).collect(),
         principal_variation_uci: candidate.best.pv.clone(),
+        refutation_variation_uci: candidate
+            .reply
+            .as_ref()
+            .map(|r| r.pv.clone())
+            .unwrap_or_default(),
         confidence: crate::review::Confidence::Verified,
         clock_secs: None,
     }

@@ -82,6 +82,17 @@ pub fn digest(validated: &ValidatedReview) -> String {
                     .map(|f| (g, f))
             }) {
                 out.push_str(&format!("- {} · ply {} · {} → better {} · {} → {}. {}\n  FEN: `{}`\n  Best line (up to 10 plies): `{}`\n", md(&g.url), f.ply, md(&f.actual_san), md(f.best_san.as_deref().unwrap_or("unknown")), evaluation(f.eval_before), evaluation(f.eval_after), md(&f.explanation), f.before_fen, f.principal_variation_uci.iter().take(10).cloned().collect::<Vec<_>>().join(" ")));
+                if !f.refutation_variation_uci.is_empty() {
+                    out.push_str(&format!(
+                        "  After your move (up to 10 plies): `{}`\n",
+                        f.refutation_variation_uci
+                            .iter()
+                            .take(10)
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    ));
+                }
             }
         }
     }
@@ -97,7 +108,7 @@ pub fn digest(validated: &ValidatedReview) -> String {
             clocks.iter().sum::<f64>() / clocks.len() as f64
         ));
     }
-    out.push_str(". Missing clocks are unknown. Phase bands use ply count, not a positional endgame classifier.\n\nEngine verdicts are checked; semantic labels still require human spot-checking before release. All findings and breakdowns are in review.json.\n");
+    out.push_str(". Missing clocks are unknown. Phase bands use ply count, not a positional endgame classifier. Pattern counts describe up to three selected findings per game, not every mistake.\n\nEngine verdicts are checked; semantic labels still require human spot-checking before release. All findings and breakdowns are in review.json.\n");
     out
 }
 fn board(fen: &str) -> String {
@@ -171,7 +182,15 @@ pub fn html(validated: &ValidatedReview) -> String {
             out.push_str("<p>No confirmed findings.</p>");
         }
         for f in &game.findings {
-            out.push_str(&format!("<article><h3>Ply {}: {} · {}</h3><p>{}</p><p>Evaluation {} → {}. Better: <strong>{}</strong>.</p><div class=boards><div><p>Before</p>{}</div><div><p>After {}</p>{}</div></div><details><summary>Reproducible evidence</summary><p>Before FEN: <code>{}</code></p><p>Actual UCI: <code>{}</code></p><p>After FEN: <code>{}</code></p><p>Best line from before: <code>{}</code></p><p>Also matched: {}</p></details></article>", f.ply, escape(&f.actual_san), label(f.classification), escape(&f.explanation), evaluation(f.eval_before), evaluation(f.eval_after), escape(f.best_san.as_deref().unwrap_or("unknown")),board(&f.before_fen),escape(&f.actual_san),board(&f.after_fen),escape(&f.before_fen),escape(&f.actual_uci),escape(&f.after_fen),escape(&f.principal_variation_uci.join(" ")),f.also_matched.iter().map(|c|label(*c)).collect::<Vec<_>>().join(", ")));
+            let refutation = if f.refutation_variation_uci.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "<p>After your move: <code>{}</code></p>",
+                    escape(&f.refutation_variation_uci.join(" "))
+                )
+            };
+            out.push_str(&format!("<article><h3>Ply {}: {} · {}</h3><p>{}</p><p>Evaluation {} → {}. Better: <strong>{}</strong>.</p><div class=boards><div><p>Before</p>{}</div><div><p>After {}</p>{}</div></div><details><summary>Reproducible evidence</summary><p>Before FEN: <code>{}</code></p><p>Actual UCI: <code>{}</code></p><p>After FEN: <code>{}</code></p><p>Best line from before: <code>{}</code></p>{refutation}<p>Also matched: {}</p></details></article>", f.ply, escape(&f.actual_san), label(f.classification), escape(&f.explanation), evaluation(f.eval_before), evaluation(f.eval_after), escape(f.best_san.as_deref().unwrap_or("unknown")),board(&f.before_fen),escape(&f.actual_san),board(&f.after_fen),escape(&f.before_fen),escape(&f.actual_uci),escape(&f.after_fen),escape(&f.principal_variation_uci.join(" ")),f.also_matched.iter().map(|c|label(*c)).collect::<Vec<_>>().join(", ")));
         }
         out.push_str("</section>");
     }

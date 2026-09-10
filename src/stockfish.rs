@@ -87,7 +87,7 @@ pub fn open(
         multipv: 1,
         clear_hash_between_positions: true,
         analysis_order:
-            "game-order; scan before/after; confirm before/after; clear hash each position; last exact-score PV; never flag final UCI bestmove".into(),
+            "game-order; initial FEN plus game history; scan before/after; confirm before/after; clear hash each position; last exact-score PV; never flag final UCI bestmove".into(),
         platform: std::env::consts::OS.into(),
         architecture: std::env::consts::ARCH.into(),
     };

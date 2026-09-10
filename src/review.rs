@@ -8,6 +8,9 @@ use thiserror::Error;
 fn default_threshold() -> u32 {
     200
 }
+fn missing_count() -> u32 {
+    u32::MAX
+}
 
 pub const SCHEMA_VERSION: &str = "1.0";
 
@@ -179,14 +182,35 @@ pub enum ValidationError {
         uci: String,
         reason: String,
     },
+    #[error(
+        "game {game}, finding {finding} has illegal refutation move {pv_index} `{uci}`: {reason}"
+    )]
+    IllegalRefutationMove {
+        game: usize,
+        finding: usize,
+        pv_index: usize,
+        uci: String,
+        reason: String,
+    },
 }
 
-pub fn validate(review: Review) -> Result<ValidatedReview, ValidationError> {
+pub fn validate(mut review: Review) -> Result<ValidatedReview, ValidationError> {
     if review.schema_version != SCHEMA_VERSION {
         return Err(ValidationError::UnsupportedSchemaVersion {
             expected: SCHEMA_VERSION,
             found: review.schema_version,
         });
+    }
+    if review.engine.threshold_cp == 0
+        || review.engine.scan_nodes == 0
+        || review.engine.deep_nodes < review.engine.scan_nodes
+        || review.engine.threads == 0
+        || review.engine.hash_mb == 0
+        || review.engine.multipv == 0
+    {
+        return Err(ValidationError::Integrity(
+            "invalid engine budgets or options".into(),
+        ));
     }
 
     let mut urls = std::collections::BTreeSet::new();
@@ -218,6 +242,13 @@ pub fn validate(review: Review) -> Result<ValidatedReview, ValidationError> {
             if f.explanation.trim().is_empty() {
                 return Err(ValidationError::Integrity("empty explanation".into()));
             }
+            if crate::analysis::loss(f.eval_before, f.eval_after)
+                < u64::from(review.engine.threshold_cp)
+            {
+                return Err(ValidationError::Integrity(
+                    "finding does not meet the confirmation threshold".into(),
+                ));
+            }
         }
         for (finding_index, finding) in game.findings.iter().enumerate() {
             validate_finding(finding, game.colour, game_index, finding_index)?;
@@ -225,7 +256,8 @@ pub fn validate(review: Review) -> Result<ValidatedReview, ValidationError> {
     }
 
     let mut classes = std::collections::BTreeSet::new();
-    for p in &review.patterns {
+    let expected_patterns = crate::patterns::aggregate(&review.games);
+    for p in &mut review.patterns {
         if !classes.insert(p.classification) {
             return Err(ValidationError::Integrity("duplicate pattern".into()));
         }
@@ -247,6 +279,25 @@ pub fn validate(review: Review) -> Result<ValidatedReview, ValidationError> {
         if affected != p.games_affected as usize || occurrences != p.occurrences as usize {
             return Err(ValidationError::Integrity(
                 "pattern counts do not match findings".into(),
+            ));
+        }
+        let expected = expected_patterns
+            .iter()
+            .find(|e| e.classification == p.classification)
+            .ok_or_else(|| ValidationError::Integrity("pattern has no source findings".into()))?;
+        // Early schema-1.0 reviews omitted these derived fields. Reconstruct
+        // missing summaries, but reject contradictory values that are present.
+        if p.games_reviewed == missing_count() {
+            p.games_reviewed = expected.games_reviewed;
+        }
+        if p.breakdowns.is_empty() {
+            p.breakdowns = expected.breakdowns.clone();
+        }
+        p.breakdowns
+            .sort_by(|a, b| (&a.dimension, &a.value).cmp(&(&b.dimension, &b.value)));
+        if p.games_reviewed != expected.games_reviewed || p.breakdowns != expected.breakdowns {
+            return Err(ValidationError::Integrity(
+                "pattern denominators or breakdowns do not match games".into(),
             ));
         }
         for e in &p.example_refs {
@@ -375,6 +426,11 @@ fn validate_finding(
                     found: san.clone(),
                 });
             }
+            if mv == chess_move {
+                return Err(ValidationError::Integrity(
+                    "best move is the actual move".into(),
+                ));
+            }
         }
         (Some(_), None) | (None, Some(_)) => {
             return Err(ValidationError::IncompleteBestMove {
@@ -402,6 +458,18 @@ fn validate_finding(
                 reason,
             })?;
         pv_position.play_unchecked(mv);
+    }
+    for (pv_index, uci) in finding.refutation_variation_uci.iter().enumerate() {
+        let mv = legal_move(&position, uci).map_err(|reason| {
+            ValidationError::IllegalRefutationMove {
+                game: game_index,
+                finding: finding_index,
+                pv_index,
+                uci: uci.clone(),
+                reason,
+            }
+        })?;
+        position.play_unchecked(mv);
     }
     Ok(())
 }
@@ -493,6 +561,9 @@ pub struct Finding {
 
     pub explanation: String,
     pub principal_variation_uci: Vec<String>,
+    /// Opponent's best continuation from after_fen; absent in older reviews.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refutation_variation_uci: Vec<String>,
     pub confidence: Confidence,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -504,7 +575,7 @@ pub struct Pattern {
     pub classification: Classification,
     pub games_affected: u32,
     pub occurrences: u32,
-    #[serde(default)]
+    #[serde(default = "missing_count")]
     pub games_reviewed: u32,
     #[serde(default)]
     pub breakdowns: Vec<Breakdown>,
@@ -540,7 +611,7 @@ pub(crate) mod tests {
     pub(crate) fn sample_review() -> Review {
         let game_url = "https://www.chess.com/game/live/172386685690";
 
-        Review {
+        let mut review = Review {
             schema_version: SCHEMA_VERSION.to_owned(),
             user: "dre4success007".to_owned(),
             generated: "2026-08-01T18:04:00Z".to_owned(),
@@ -598,6 +669,7 @@ pub(crate) mod tests {
                         "h4g3".to_owned(),
                         "d8d7".to_owned(),
                     ],
+                    refutation_variation_uci: vec![],
                     confidence: Confidence::Verified,
                     clock_secs: None,
                 }],
@@ -613,7 +685,9 @@ pub(crate) mod tests {
                     ply: 30,
                 }],
             }],
-        }
+        };
+        review.patterns = crate::patterns::aggregate(&review.games);
+        review
     }
 
     #[test]
@@ -839,6 +913,67 @@ pub(crate) mod tests {
         assert!(matches!(validate(r), Err(ValidationError::Integrity(_))));
     }
     #[test]
+    fn rejects_contradictory_verdicts_and_derived_summaries() {
+        let mut zero_loss = sample_review();
+        zero_loss.games[0].findings[0].eval_after = zero_loss.games[0].findings[0].eval_before;
+        assert!(matches!(
+            validate(zero_loss),
+            Err(ValidationError::Integrity(_))
+        ));
+        let mut same_move = sample_review();
+        let f = &mut same_move.games[0].findings[0];
+        f.best_uci = Some(f.actual_uci.clone());
+        f.best_san = Some(f.actual_san.clone());
+        f.principal_variation_uci = vec![f.actual_uci.clone()];
+        assert!(matches!(
+            validate(same_move),
+            Err(ValidationError::Integrity(_))
+        ));
+        let mut denominator = sample_review();
+        denominator.patterns[0].games_reviewed = 0;
+        assert!(matches!(
+            validate(denominator),
+            Err(ValidationError::Integrity(_))
+        ));
+        let mut breakdown = sample_review();
+        breakdown.patterns[0].breakdowns[0].occurrences = 999;
+        assert!(matches!(
+            validate(breakdown),
+            Err(ValidationError::Integrity(_))
+        ));
+        let mut budget = sample_review();
+        budget.engine.scan_nodes = 0;
+        assert!(matches!(
+            validate(budget),
+            Err(ValidationError::Integrity(_))
+        ));
+    }
+    #[test]
+    fn legacy_missing_summaries_and_refutation_remain_readable() {
+        let expected = sample_review();
+        let mut json = serde_json::to_value(&expected).unwrap();
+        let pattern = json["patterns"][0].as_object_mut().unwrap();
+        pattern.remove("games_reviewed");
+        pattern.remove("breakdowns");
+        json["games"][0]["findings"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("refutation_variation_uci");
+        let validated = validate(serde_json::from_value(json).unwrap()).unwrap();
+        assert_eq!(validated.into_inner(), expected);
+    }
+    #[test]
+    fn refutation_replays_from_after_the_actual_move() {
+        let mut r = sample_review();
+        r.games[0].findings[0].refutation_variation_uci = vec!["h4d8".into(), "e8d8".into()];
+        validate(r.clone()).unwrap();
+        r.games[0].findings[0].refutation_variation_uci = vec!["f6e4".into()];
+        assert!(matches!(
+            validate(r),
+            Err(ValidationError::IllegalRefutationMove { pv_index: 0, .. })
+        ));
+    }
+    #[test]
     fn validates_special_moves_by_replaying_canonical_fens_and_san() {
         use shakmaty::{EnPassantMode, Position, fen::Fen, san::SanPlus};
         for (fen, uci) in [
@@ -857,10 +992,15 @@ pub(crate) mod tests {
             f.before_fen = fen.into();
             f.after_fen = Fen::from_position(&after, EnPassantMode::Legal).to_string();
             f.actual_uci = uci.into();
-            f.actual_san = SanPlus::from_move(before, mv).to_string();
-            f.best_uci = Some(uci.into());
-            f.best_san = Some(f.actual_san.clone());
-            f.principal_variation_uci = vec![uci.into()];
+            f.actual_san = SanPlus::from_move(before.clone(), mv).to_string();
+            let alternative = before.legal_moves().into_iter().find(|m| *m != mv).unwrap();
+            let alternative_uci = alternative
+                .to_uci(shakmaty::CastlingMode::Standard)
+                .to_string();
+            f.best_uci = Some(alternative_uci.clone());
+            f.best_san = Some(SanPlus::from_move(before, alternative).to_string());
+            f.principal_variation_uci = vec![alternative_uci];
+            r.patterns = crate::patterns::aggregate(&r.games);
             validate(r).unwrap();
         }
     }
