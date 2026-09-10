@@ -15,6 +15,7 @@ export default function RatingPanel({
   graph,
   pace,
   change,
+  samplePlayer,
 }: {
   graph: {
     index: number;
@@ -25,6 +26,7 @@ export default function RatingPanel({
   }[];
   pace: Pace;
   change: number | null;
+  samplePlayer?: string;
 }) {
   const [range, setRange] = useState(40);
   const id = useId().replaceAll(':', '');
@@ -39,7 +41,9 @@ export default function RatingPanel({
       <div className="section-heading">
         <div>
           <span className="eyebrow">THE BIGGER PICTURE</span>
-          <h2>Your rating journey</h2>
+          <h2>
+            {samplePlayer ? `${samplePlayer}’s rating journey` : 'Your rating journey'}
+          </h2>
         </div>
         <TrendingUp className="panel-icon" size={23} />
       </div>

@@ -13,10 +13,13 @@ import { gameKey, readRoute, routeUrl } from '../lib/navigation.ts';
 import { findingPosition } from '../lib/study.ts';
 
 const archive = JSON.parse(
-  await readFile(new URL('../public/example/games.json', import.meta.url), 'utf8'),
+  await readFile(new URL('../../tests/fixtures/rapid-12.json', import.meta.url), 'utf8'),
 ) as { games: ApiGame[] };
 const saved = JSON.parse(
-  await readFile(new URL('../public/example/review.json', import.meta.url), 'utf8'),
+  await readFile(
+    new URL('../../tests/fixtures/rapid-12-review.json', import.meta.url),
+    'utf8',
+  ),
 ) as SavedReview;
 const base = parseGame(archive.games[0], saved.user)!;
 const games = ['101', '102', '103', '104'].map((id) => ({

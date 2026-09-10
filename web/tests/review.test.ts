@@ -18,10 +18,13 @@ import {
 } from '../lib/rust-core.ts';
 import { exactInfo } from '../lib/engine.ts';
 const archive = JSON.parse(
-  await readFile(new URL('../public/example/games.json', import.meta.url), 'utf8'),
+  await readFile(new URL('../../tests/fixtures/rapid-12.json', import.meta.url), 'utf8'),
 ) as { games: ApiGame[] };
 const saved = JSON.parse(
-  await readFile(new URL('../public/example/review.json', import.meta.url), 'utf8'),
+  await readFile(
+    new URL('../../tests/fixtures/rapid-12-review.json', import.meta.url),
+    'utf8',
+  ),
 ) as SavedReview;
 const user = 'dre4success007';
 test('username form pattern compiles with HTML Unicode sets and accepts hyphens', () => {

@@ -33,6 +33,7 @@ export default function StudioOverview({
   busy,
   onContinue,
   canContinue,
+  samplePlayer,
 }: {
   games: Game[];
   analyses: Record<string, GameAnalysis>;
@@ -42,6 +43,7 @@ export default function StudioOverview({
   busy: boolean;
   onContinue: () => void;
   canContinue: boolean;
+  samplePlayer?: string;
 }) {
   const [showAll, setShowAll] = useState(false);
   const stats = useMemo(() => summarise(games), [games]);
@@ -120,18 +122,25 @@ export default function StudioOverview({
           <Suspense
             fallback={
               <div className="panel rating-panel skeleton-chart" role="status">
-                Drawing your rating journey…
+                Drawing the rating journey…
               </div>
             }
           >
-            <RatingPanel graph={graph} pace={pace} change={stats.change} />
+            <RatingPanel
+              graph={graph}
+              pace={pace}
+              change={stats.change}
+              samplePlayer={samplePlayer}
+            />
           </Suspense>
         </RatingPanelBoundary>
         <section className="panel results-panel">
           <div className="section-heading">
             <div>
               <span className="eyebrow">HOW THE GAMES WENT</span>
-              <h2>The shape of your play</h2>
+              <h2>
+                {samplePlayer ? 'How the sample played out' : 'The shape of your play'}
+              </h2>
             </div>
           </div>
           <div className="result-donut">
@@ -188,7 +197,9 @@ export default function StudioOverview({
             ))}
           </div>
           <p className="sample-note">
-            Your whole imported sample. Every result adds context.
+            {samplePlayer
+              ? 'Every result in this sample adds context.'
+              : 'Your whole imported sample. Every result adds context.'}
           </p>
         </section>
         <section className="practice-focus">
@@ -235,7 +246,11 @@ export default function StudioOverview({
               className="ink-button"
               onClick={() => onReview(focusGame, focus?.ply)}
             >
-              {focus ? 'Step into the position' : 'Review your latest game'}
+              {focus
+                ? 'Step into the position'
+                : samplePlayer
+                  ? 'Explore a sample game'
+                  : 'Review your latest game'}
               <ArrowUpRight size={19} />
             </button>
           </div>
@@ -303,7 +318,9 @@ export default function StudioOverview({
           <div className="section-heading">
             <div>
               <span className="eyebrow">THE SOURCE MATERIAL</span>
-              <h2>Your recent games</h2>
+              <h2>
+                {samplePlayer ? `${samplePlayer}’s sample games` : 'Your recent games'}
+              </h2>
             </div>
             <span className="subtle-chip">{pace}</span>
           </div>
@@ -361,7 +378,7 @@ export default function StudioOverview({
                       >
                         <span>
                           {analyses[g.id]
-                            ? `${analyses[g.id].findings.length} moments`
+                            ? `${analyses[g.id].findings.length} ${analyses[g.id].findings.length === 1 ? 'moment' : 'moments'}`
                             : 'Explore'}
                         </span>
                         <ArrowUpRight size={17} />
@@ -386,11 +403,17 @@ export default function StudioOverview({
         <section className="panel openings-panel">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">YOUR OPENING PALETTE</span>
+              <span className="eyebrow">
+                {samplePlayer ? 'OPENINGS IN THIS SAMPLE' : 'YOUR OPENING PALETTE'}
+              </span>
               <h2>Familiar territory</h2>
             </div>
           </div>
-          <p className="panel-subtitle">The positions you return to most.</p>
+          <p className="panel-subtitle">
+            {samplePlayer
+              ? 'The positions this player returned to.'
+              : 'The positions you return to most.'}
+          </p>
           <div className="opening-list">
             {stats.openings.slice(0, 5).map((o) => (
               <div className="opening-row" key={`${o.colour}:${o.name}`}>

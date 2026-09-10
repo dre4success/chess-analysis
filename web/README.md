@@ -1,6 +1,6 @@
 # Tempo
 
-A personal chess studio: enter a Chess.com username, import recent games, and explore the positions that matter. The graphite and lime interface puts the board first, with a real interactive example, rating and opening trends, move replay, and saved reviews.
+A personal chess studio: enter a Chess.com username, import recent games, and explore the positions that matter. The interface includes rating and opening trends, move replay, saved reviews, and a clearly labeled sample of Hikaru Nakamura’s public blitz games.
 
 ## Run the complete app
 
@@ -32,6 +32,8 @@ npm --prefix web run dev
 
 Vite proxies `/api`, `/example` and the favicon to Rust at `127.0.0.1:8080`. Fonts are bundled locally. `npm run build` emits only the frontend and example data into `dist/selfhost/`.
 
+The sample’s original game data and verified analysis live in `public/example/`, with [source and reproduction notes](public/example/README.md). `assets/example-profile.json` identifies the public player and pace; `assets/example-preview.json` selects a verified moment from that same sample. The homepage card opens that exact position. Sample controls return visitors to the username form, and browsing the sample does not populate their library. Regression tests retain historical cases in the repository’s `tests/fixtures/`, separately from the public sample.
+
 ## Native analysis and saved reviews
 
 `src/server/` owns the persistent SQLite queue. A single worker imports up to 40 completed, rated standard games from the latest eight active months and automatically reviews the latest five. Select any other imported game to review it on demand. Rapid, blitz and bullet are separate samples.
@@ -59,6 +61,6 @@ The tests cover source statistics, completion boundaries, legal finding replay, 
 
 ## Data and search limits
 
-Chess.com may cache public data for up to 12 hours. Ratings are recorded game ratings. Invalid or unsupported PGNs are excluded and counted. A bounded engine search can miss mistakes; the interface does not invent an accuracy percentage or claim a structural detector proves a unique tactical cause. Engine lines start from individual positions; history-dependent repetition is not inferred.
+Chess.com may cache public data for up to 12 hours. Ratings are recorded game ratings. Invalid or unsupported PGNs are excluded and counted. A bounded engine search can miss mistakes; the interface does not invent an accuracy percentage or claim a structural detector proves a unique tactical cause. New analysis sends the game’s move history to Stockfish so repetition is available to the search.
 
 Sources: [Chess.com public API](https://support.chess.com/en/articles/9650547-what-is-the-pubapi-and-how-do-i-use-it), [Stockfish 18](https://github.com/official-stockfish/Stockfish/tree/sf_18), [chess.js](https://jhlywa.github.io/chess.js/).

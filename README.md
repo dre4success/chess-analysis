@@ -80,6 +80,8 @@ docker compose --env-file .env --env-file tag.env -f docker-compose.yml up -d --
 
 Each browser remembers up to 100 explicitly looked-up usernames in local storage. Welcome and the library request reviews only for those players; a new browser starts empty, and viewing the example or a direct review link does not add a player. Clearing site data clears that browser’s lookup list, not the saved reviews. Searching the username again makes its saved reviews available.
 
+The public sample is a fixed, engine-checked selection of Hikaru Nakamura’s public blitz games. It is labeled throughout the studio; the homepage position opens directly in the study room. **Find my games** returns to the username form without importing the sample player. See the [sample provenance](web/public/example/README.md) for source data and reproduction instructions.
+
 Saved reviews and analysis caches remain shared on the server, with no built-in login: username filtering organizes discovery, not access control. Anyone able to reach the instance can deliberately look up a public profile or open a known review link. Set `TEMPO_TRAEFIK_MIDDLEWARES` in `.env` to use existing authentication, such as `auth@file`.
 
 ### GitHub Actions

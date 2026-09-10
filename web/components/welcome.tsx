@@ -15,10 +15,12 @@ import { USERNAME_PATTERN, timeLabel } from '../lib/chess';
 import type { ReviewSummary } from '../lib/api';
 import artwork from '../assets/tempo-still-life.jpg';
 import preview from '../assets/example-preview.json';
+import exampleProfile from '../assets/example-profile.json';
 
 export default function Welcome({
   onConnect,
   onExample,
+  onExamplePosition,
   busy,
   error,
   savedReviews,
@@ -27,6 +29,7 @@ export default function Welcome({
 }: {
   onConnect: (name: string) => void;
   onExample: () => void;
+  onExamplePosition: () => void;
   busy: boolean;
   error: string;
   savedReviews: ReviewSummary[];
@@ -35,6 +38,9 @@ export default function Welcome({
 }) {
   const [username, setUsername] = useState('');
   const [choice, setChoice] = useState<'before' | 'played' | 'better'>('before');
+  const previewColour = preview.fen.split(' ')[1];
+  const previewPlayer = previewColour === 'b' ? preview.black : preview.white;
+  const previewOpponent = previewColour === 'b' ? preview.white : preview.black;
   const position = useMemo(() => {
     const c = new Chess(preview.fen);
     if (choice === 'before') return { fen: preview.fen, squares: [] as string[] };
@@ -123,7 +129,7 @@ export default function Welcome({
               onClick={onExample}
               disabled={busy}
             >
-              Explore a real review <ArrowUpRight size={17} />
+              Explore a sample review <ArrowUpRight size={17} />
             </button>
             <div className="hero-signature">
               <span className="signature-orbit">64</span>
@@ -220,15 +226,17 @@ export default function Welcome({
         </section>
         <section className="welcome-example">
           <div className="example-editorial">
-            <span className="eyebrow">A SMALL MOVE. A NEW POSSIBILITY.</span>
+            <span className="eyebrow">
+              SAMPLE REVIEW · {exampleProfile.name.toUpperCase()}
+            </span>
             <h2>
               What would
               <br />
               <em>you play?</em>
             </h2>
             <p>
-              This position comes from a real completed game. Compare the moves, then
-              follow the full continuation in the studio.
+              An engine-checked moment from {exampleProfile.name}’s public games. Compare
+              the moves, then explore this exact position in the study room.
             </p>
             <div className="example-pills">
               <span>
@@ -236,7 +244,7 @@ export default function Welcome({
                 {timeLabel(preview.timeControl)}
               </span>
               <span>Move {preview.move}</span>
-              <span>White to move</span>
+              <span>{previewColour === 'b' ? 'Black' : 'White'} to move</span>
             </div>
             <div className="preview-choices">
               {(['before', 'played', 'better'] as const).map((c) => (
@@ -254,19 +262,27 @@ export default function Welcome({
                 </button>
               ))}
             </div>
-            <button className="primary-button" onClick={onExample} disabled={busy}>
-              Open the full review <ArrowUpRight size={18} />
+            <button
+              className="primary-button"
+              onClick={onExamplePosition}
+              disabled={busy}
+            >
+              Explore this sample position <ArrowUpRight size={18} />
             </button>
           </div>
           <div className="example-board-wrap">
             <div className="example-board-label">
-              <span>{preview.black.username}</span>
-              <span>{preview.black.rating}</span>
+              <span>{previewOpponent.username}</span>
+              <span>{previewOpponent.rating}</span>
             </div>
-            <Board fen={position.fen} highlights={position.squares} />
+            <Board
+              fen={position.fen}
+              highlights={position.squares}
+              flipped={previewColour === 'b'}
+            />
             <div className="example-board-label">
-              <span>{preview.white.username}</span>
-              <span>{preview.white.rating}</span>
+              <span>{previewPlayer.username}</span>
+              <span>{previewPlayer.rating}</span>
             </div>
           </div>
         </section>

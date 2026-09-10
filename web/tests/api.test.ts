@@ -22,7 +22,10 @@ const job: ReviewJob = {
 };
 const importedGames = (
   JSON.parse(
-    await readFile(new URL('../public/example/games.json', import.meta.url), 'utf8'),
+    await readFile(
+      new URL('../../tests/fixtures/rapid-12.json', import.meta.url),
+      'utf8',
+    ),
   ) as { games: ApiGame[] }
 ).games.toSorted((a, b) => b.end_time - a.end_time);
 const games = importedGames.map((g) => parseGame(g, job.username)!);
@@ -131,7 +134,10 @@ test('API errors remain useful, including when a reverse proxy returns HTML', as
 
 test('saved native findings become replayable UI data without a browser engine', async () => {
   const review = JSON.parse(
-    await readFile(new URL('../public/example/review.json', import.meta.url), 'utf8'),
+    await readFile(
+      new URL('../../tests/fixtures/rapid-12-review.json', import.meta.url),
+      'utf8',
+    ),
   ) as SavedReview;
   const mapped = mappedAnalyses({ ...job, review });
   assert.equal(Object.keys(mapped).length, review.games.length);

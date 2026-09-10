@@ -1,34 +1,34 @@
 {
-  "url": "https://www.chess.com/game/live/173928199510",
-  "fen": "8/1pqbk1p1/p1p1p2p/P1PpP1P1/1P1P3P/5QP1/6B1/6K1 w - - 2 31",
-  "actual": "g6",
-  "best": "gxh6",
-  "move": 31,
-  "username": "dre4success007",
+  "url": "https://www.chess.com/game/live/173731035234",
+  "fen": "r3k2r/ppp2p1p/7q/4nbp1/2BBpN2/1P2P1P1/P2P1PKb/R2Q1R2 w kq - 0 16",
+  "actual": "Rh1",
+  "best": "Qh5",
+  "move": 16,
+  "username": "hikaru",
   "white": {
-    "rating": 1020,
-    "result": "win",
-    "@id": "https://api.chess.com/pub/player/dre4success007",
-    "username": "Dre4success007",
-    "uuid": "fcf6d474-8bfd-11f1-b746-e79d1e944fae"
+    "rating": 3374,
+    "result": "checkmated",
+    "@id": "https://api.chess.com/pub/player/hikaru",
+    "username": "Hikaru",
+    "uuid": "6f4deb88-7718-11e3-8016-000000000000"
   },
   "black": {
-    "rating": 916,
-    "result": "resigned",
-    "@id": "https://api.chess.com/pub/player/mhelteo",
-    "username": "mhelteo",
-    "uuid": "e2f35fbc-0556-11f1-a4d6-6302fd1ac551"
+    "rating": 2846,
+    "result": "win",
+    "@id": "https://api.chess.com/pub/player/sajid0987654321",
+    "username": "Sajid0987654321",
+    "uuid": "49ac5a20-8af0-11ea-bb5a-d7085849d6bc"
   },
-  "timeControl": "600",
-  "clockSecs": 473.2,
+  "timeControl": "180",
+  "clockSecs": 125.6,
   "before": {
     "type": "cp",
-    "value": 1205,
+    "value": 446,
     "pov": "user"
   },
   "after": {
     "type": "cp",
-    "value": 390,
+    "value": -444,
     "pov": "user"
   }
 }

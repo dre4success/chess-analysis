@@ -36,6 +36,8 @@ import {
 import { convertFinding, type SavedReview } from '../lib/review-data';
 import { gameKey, readRoute, routeUrl, type StudioRoute } from '../lib/navigation';
 import type { StudyPosition } from '../lib/study';
+import exampleProfile from '../assets/example-profile.json';
+import examplePreview from '../assets/example-preview.json';
 
 type Example = { data: PlayerData; review: SavedReview };
 export default function Home() {
@@ -184,9 +186,9 @@ export default function Home() {
           setExample({
             review: r,
             data: {
-              profile: { username: r.user },
+              profile: { username: r.user, name: exampleProfile.name },
               games: g.games.toSorted((a, b) => b.end_time - a.end_time),
-              pace: 'rapid',
+              pace: exampleProfile.pace as Pace,
               fetchedAt: r.generated,
               archivesRead: 1,
             },
@@ -320,7 +322,11 @@ export default function Home() {
   }
   async function analyse(batch: Game[]) {
     if (!data || !batch.length) return;
-    if (!job || example) {
+    if (example) {
+      home();
+      return;
+    }
+    if (!job) {
       await connect(data.profile.username, pace);
       return;
     }
@@ -342,6 +348,16 @@ export default function Home() {
       <Welcome
         onConnect={(n) => void connect(n)}
         onExample={() => navigate({ view: 'overview', example: true })}
+        onExamplePosition={() => {
+          const findingPly =
+            examplePreview.move * 2 - (examplePreview.fen.split(' ')[1] === 'w' ? 1 : 0);
+          navigate({
+            view: 'review',
+            example: true,
+            gameId: gameKey(examplePreview.url),
+            position: { ply: findingPly - 1, mode: 'before', findingPly },
+          });
+        }}
         busy={busy}
         error={problem}
         savedReviews={saved.filter((review) =>
@@ -403,9 +419,11 @@ export default function Home() {
         </nav>
         <button className="account-button" onClick={home}>
           <span className="mini-avatar">
-            {data?.profile.username[0].toUpperCase() ?? 'T'}
+            {example ? 'T' : (data?.profile.username[0].toUpperCase() ?? 'T')}
           </span>
-          <span>{data?.profile.username ?? 'Your studio'}</span>
+          <span>
+            {example ? 'Try your games' : (data?.profile.username ?? 'Your studio')}
+          </span>
           <ArrowUpRight size={16} />
         </button>
       </header>
@@ -428,14 +446,19 @@ export default function Home() {
                     <span className="eyebrow">
                       <span className="live-dot" />
                       {example
-                        ? 'A REAL REVIEW, READY TO EXPLORE'
+                        ? `SAMPLE REVIEW · ${exampleProfile.name.toUpperCase()}`
                         : 'YOUR PERSONAL CHESS STUDIO'}
                     </span>
                     <h1>
-                      Your chess,
-                      <br className="mobile-break" /> <em>in perspective.</em>
+                      {example ? `${exampleProfile.shortName}’s chess,` : 'Your chess,'}
+                      <br className="mobile-break" />{' '}
+                      <em>{example ? 'up close.' : 'in perspective.'}</em>
                     </h1>
-                    <p>A little reflection today. A more thoughtful move tomorrow.</p>
+                    <p>
+                      {example
+                        ? 'Explore real games from a grandmaster. Then bring your own.'
+                        : 'A little reflection today. A more thoughtful move tomorrow.'}
+                    </p>
                   </>
                 ) : (
                   <>
@@ -458,37 +481,43 @@ export default function Home() {
                 )}
               </div>
               <div className="heading-actions">
-                <div className="pace-switch" aria-label="Time format">
-                  {(['rapid', 'blitz', 'bullet'] as Pace[]).map((p) => (
+                {example ? (
+                  <span className="subtle-chip">{pace} · sample</span>
+                ) : (
+                  <>
+                    <div className="pace-switch" aria-label="Time format">
+                      {(['rapid', 'blitz', 'bullet'] as Pace[]).map((p) => (
+                        <button
+                          key={p}
+                          aria-pressed={pace === p}
+                          disabled={busy}
+                          onClick={() => void connect(data!.profile.username, p)}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
                     <button
-                      key={p}
-                      aria-pressed={pace === p}
+                      className="icon-button"
+                      title="Import the latest games"
+                      aria-label="Refresh games"
                       disabled={busy}
-                      onClick={() => void connect(data!.profile.username, p)}
+                      onClick={() => void connect(data!.profile.username, pace)}
                     >
-                      {p}
+                      <RefreshCw size={18} className={busy ? 'spin' : ''} />
                     </button>
-                  ))}
-                </div>
-                <button
-                  className="icon-button"
-                  title="Import the latest games"
-                  aria-label="Refresh games"
-                  disabled={busy}
-                  onClick={() => void connect(data!.profile.username, pace)}
-                >
-                  <RefreshCw size={18} className={busy ? 'spin' : ''} />
-                </button>
+                  </>
+                )}
               </div>
             </div>
             {example && (
               <div className="example-notice">
                 <span>
-                  <SparkIcon /> You’re exploring {games.length} completed games with a
-                  saved review.
+                  <SparkIcon /> Sample: {games.length} of {exampleProfile.shortName}’s
+                  public games, with a saved engine review.
                 </span>
-                <button onClick={() => void connect(data!.profile.username, pace)}>
-                  Import your latest games <ArrowRight size={15} />
+                <button onClick={home}>
+                  Find my games <ArrowRight size={15} />
                 </button>
               </div>
             )}
@@ -612,6 +641,7 @@ export default function Home() {
                 onAnalyse={() => void analyse([selected])}
                 busy={active}
                 progress={job?.message ?? ''}
+                samplePlayer={example ? exampleProfile.shortName : undefined}
               />
             ) : (
               <StudioOverview
@@ -627,6 +657,7 @@ export default function Home() {
                 busy={active}
                 canContinue={!example && remaining.length > 0}
                 onContinue={() => void analyse(remaining)}
+                samplePlayer={example ? exampleProfile.shortName : undefined}
               />
             )}
             <details className="review-method">
@@ -635,16 +666,18 @@ export default function Home() {
               </summary>
               <div>
                 <p>
-                  Trends use up to 40 completed, rated standard games from the latest
-                  eight active months. Ratings are recorded in each game. Chess.com public
-                  data can take time to update.
+                  {example
+                    ? `This sample uses ${games.length} completed, rated ${pace} games from ${exampleProfile.name}’s public Chess.com archive. It is a fixed selection, not a live profile. Ratings are recorded in each game.`
+                    : 'Trends use up to 40 completed, rated standard games from the latest eight active months. Ratings are recorded in each game. Chess.com public data can take time to update.'}
                 </p>
                 <p>
-                  The latest five games are checked automatically. Each position uses
-                  150,000 scan nodes and 1,000,000 confirmation nodes with native
-                  Stockfish. Up to three substantial mistakes are selected per game. A
-                  bounded search can miss mistakes; an empty review does not mean perfect
-                  play.
+                  {example
+                    ? 'Every game in this sample has been checked.'
+                    : 'The latest five games are checked automatically.'}{' '}
+                  Each position uses 150,000 scan nodes and 1,000,000 confirmation nodes
+                  with native Stockfish. Up to three substantial mistakes are selected per
+                  game. A bounded search can miss mistakes; an empty review does not mean
+                  perfect play.
                 </p>
                 <p>
                   New analysis includes the game’s move history. Older saved reviews
@@ -653,9 +686,9 @@ export default function Home() {
                   the alternative and treat small pattern samples as observations.
                 </p>
                 <p>
-                  Reviews stay saved on this server. Your library shows players you’ve
-                  looked up in this browser. Closing a tab stops polling, and an explicit
-                  Stop keeps completed results.{' '}
+                  {example
+                    ? 'Exploring this sample does not add the player to your library. Enter your own Chess.com username to start your review.'
+                    : 'Reviews stay saved on this server. Your library shows players you’ve looked up in this browser. Closing a tab stops polling, and an explicit Stop keeps completed results.'}{' '}
                   <a
                     href="https://support.chess.com/en/articles/9650547-what-is-the-pubapi-and-how-do-i-use-it"
                     target="_blank"

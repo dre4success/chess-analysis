@@ -13,7 +13,10 @@ import {
 } from '../lib/study.ts';
 
 const saved = JSON.parse(
-  await readFile(new URL('../public/example/review.json', import.meta.url), 'utf8'),
+  await readFile(
+    new URL('../../tests/fixtures/rapid-12-review.json', import.meta.url),
+    'utf8',
+  ),
 ) as SavedReview;
 const find = (gameId: string, ply: number) => {
   const raw = saved.games
@@ -22,7 +25,7 @@ const find = (gameId: string, ply: number) => {
   return { raw, finding: convertFinding(raw) };
 };
 
-test('the example alternative reaches its promotion and both complete mating lines', () => {
+test('the saved alternative reaches its promotion and both complete mating lines', () => {
   const promotion = find('173928199510', 61);
   assert.equal(promotion.finding.pv[10], 'g8=Q');
   assert.equal(promotion.finding.pv.length, promotion.raw.principal_variation_uci.length);

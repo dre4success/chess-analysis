@@ -8,11 +8,13 @@ export default function GameNavigator({
   analyses,
   selectedId,
   onSelect,
+  sample = false,
 }: {
   games: Game[];
   analyses: Record<string, GameAnalysis>;
   selectedId: string;
   onSelect: (id: string) => void;
+  sample?: boolean;
 }) {
   const list = useRef<HTMLOListElement>(null);
   const selected = useRef<HTMLButtonElement>(null);
@@ -68,7 +70,7 @@ export default function GameNavigator({
       <div className="rail-heading">
         <div className="rail-title-row">
           <h2>
-            Your games <span>{games.length}</span>
+            {sample ? 'Sample games' : 'Your games'} <span>{games.length}</span>
           </h2>
           <div className="rail-scroll-controls">
             <button

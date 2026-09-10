@@ -175,6 +175,7 @@ export default function GameReview({
   focusPly,
   position,
   onPositionChange,
+  samplePlayer,
 }: {
   game: Game;
   games: Game[];
@@ -187,6 +188,7 @@ export default function GameReview({
   focusPly?: number;
   position?: StudyPosition;
   onPositionChange?: (position: StudyPosition) => void;
+  samplePlayer?: string;
 }) {
   const [localPosition, setLocalPosition] = useState<StudyPosition>(() => {
     const first =
@@ -350,14 +352,19 @@ export default function GameReview({
         analyses={analyses}
         selectedId={game.id}
         onSelect={onSelect}
+        sample={!!samplePlayer}
       />
       <div className="review-board-panel">
         <div className="board-person">
           <span className={`mini-avatar ${topColour === game.colour ? 'peach' : ''}`}>
-            {topColour === game.colour ? 'You' : game.opponent[0].toUpperCase()}
+            {topColour === game.colour
+              ? (samplePlayer?.[0] ?? 'You')
+              : game.opponent[0].toUpperCase()}
           </span>
           <div>
-            <strong>{topColour === game.colour ? 'You' : game.opponent}</strong>
+            <strong>
+              {topColour === game.colour ? (samplePlayer ?? 'You') : game.opponent}
+            </strong>
             <span>
               {topColour === 'w' ? 'White' : 'Black'} ·{' '}
               {topColour === game.colour ? game.rating : game.opponentRating}
@@ -570,10 +577,14 @@ export default function GameReview({
         )}
         <div className="board-person">
           <span className={`mini-avatar ${topColour !== game.colour ? 'peach' : ''}`}>
-            {topColour !== game.colour ? 'You' : game.opponent[0].toUpperCase()}
+            {topColour !== game.colour
+              ? (samplePlayer?.[0] ?? 'You')
+              : game.opponent[0].toUpperCase()}
           </span>
           <div>
-            <strong>{topColour !== game.colour ? 'You' : game.opponent}</strong>
+            <strong>
+              {topColour !== game.colour ? (samplePlayer ?? 'You') : game.opponent}
+            </strong>
             <span>
               {topColour === 'w' ? 'Black' : 'White'} ·{' '}
               {topColour !== game.colour ? game.rating : game.opponentRating}
@@ -591,7 +602,9 @@ export default function GameReview({
       <div className="review-detail">
         <div>
           <div className="section-heading">
-            <h2>You vs {game.opponent}</h2>
+            <h2>
+              {samplePlayer ?? 'You'} vs {game.opponent}
+            </h2>
             <a
               href={game.id}
               target="_blank"
@@ -633,8 +646,9 @@ export default function GameReview({
               <Check size={24} />
               <h3>No large swings confirmed.</h3>
               <p>
-                This search did not confirm a two-pawn loss or a lost forced mate on your
-                moves. Keep exploring: a bounded review can miss mistakes.
+                This search did not confirm a two-pawn loss or a lost forced mate on{' '}
+                {samplePlayer ? `${samplePlayer}’s` : 'your'} moves. Keep exploring: a
+                bounded review can miss mistakes.
               </p>
             </div>
           ) : (
@@ -663,7 +677,9 @@ export default function GameReview({
                   <div className="finding-context">
                     Move {Math.ceil(finding.ply / 2)} ·{' '}
                     {current.mode === 'before'
-                      ? 'Before your move'
+                      ? samplePlayer
+                        ? 'Before the move'
+                        : 'Before your move'
                       : current.mode === 'played'
                         ? `After ${finding.actual}`
                         : current.mode === 'refutation'
@@ -674,7 +690,7 @@ export default function GameReview({
                   <p>{finding.explanation}</p>
                   <div className="eval-comparison">
                     <div>
-                      <span>Before your move</span>
+                      <span>{samplePlayer ? 'Before the move' : 'Before your move'}</span>
                       <strong>{evalLabel(finding.before)}</strong>
                     </div>
                     <span className="eval-drop">
@@ -700,8 +716,9 @@ export default function GameReview({
                     </div>
                   )}
                   <p className="evaluation-note">
-                    Scores are from your side. +1 means about a pawn’s advantage; M means
-                    a forced mate in the shown number of moves.
+                    Scores are from {samplePlayer ? `${samplePlayer}’s` : 'your'} side. +1
+                    means about a pawn’s advantage; M means a forced mate in the shown
+                    number of moves.
                   </p>
                   {finding.clockSecs != null && (
                     <p className="finding-clock">
@@ -726,8 +743,8 @@ export default function GameReview({
                       : `You’re viewing move ${Math.ceil(ply / 2)}.`}
                   </h4>
                   <p>
-                    Pick a marked key moment above to compare your move with the verified
-                    alternative. The arrows continue through the original game.
+                    Pick a marked key moment above to compare the played move with the
+                    verified alternative. The arrows continue through the original game.
                   </p>
                 </div>
               )}
