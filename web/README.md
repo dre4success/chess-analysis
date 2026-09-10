@@ -40,7 +40,7 @@ Vite proxies `/api`, `/example` and the favicon to Rust at `127.0.0.1:8080`. Fon
 
 Closing the tab only stops polling. The server continues, and `?review=<id>` restores the review. The review shelf lists recent jobs. Cancelling explicitly stops the job at the next engine boundary and keeps finished games. After a server restart, interrupted jobs resume; completed games come from cache. Cache identity includes the Rust executable, Stockfish executable and metadata, username, game URL and exact PGN bytes.
 
-The old WASM adapter, browser-engine scripts and Sites configuration remain as the earlier prototype. They are not used by the self-hosted application or copied into its production build. The existing compiled-core regression test remains for that adapter.
+The old WASM adapter and browser-engine scripts remain for regression checks. They are not used by the self-hosted application or copied into its production build.
 
 ## Formatting and checks
 
