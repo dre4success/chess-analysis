@@ -4,6 +4,10 @@
 /docs
 /.chess-review-cache
 /review-output
+/PLAN.md
+/SPEC.md
+/VALIDATION.md
+/AUDIT.md
 
 /tempo-data
 /.env
