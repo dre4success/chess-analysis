@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { api, mappedAnalyses, watchReview, type ReviewJob } from '../lib/api.ts';
+import {
+  api,
+  mappedAnalyses,
+  remainingReviewGames,
+  watchReview,
+  type ReviewJob,
+} from '../lib/api.ts';
+import { parseGame, type ApiGame, type GameAnalysis } from '../lib/chess.ts';
 import type { SavedReview } from '../lib/review-data.ts';
 
 const job: ReviewJob = {
@@ -13,6 +20,76 @@ const job: ReviewJob = {
   progress: { completed: 1, total: 1, positions: 30 },
   message: 'Ready',
 };
+const importedGames = (
+  JSON.parse(
+    await readFile(new URL('../public/example/games.json', import.meta.url), 'utf8'),
+  ) as { games: ApiGame[] }
+).games.toSorted((a, b) => b.end_time - a.end_time);
+const games = importedGames.map((g) => parseGame(g, job.username)!);
+const checked = (...indices: number[]): Record<string, GameAnalysis> =>
+  Object.fromEntries(
+    indices.map((i) => [
+      games[i].id,
+      {
+        id: games[i].id,
+        findings: [],
+        source: 'native' as const,
+        positions: 0,
+      },
+    ]),
+  );
+
+test('continuing repeated partial reviews preserves the original five-game scope', () => {
+  const initial = {
+    ...job,
+    target_urls: [],
+    progress: { completed: 2, total: 5, positions: 0 },
+  };
+  const remaining = remainingReviewGames(initial, games, checked(0, 1));
+  assert.deepEqual(remaining, games.slice(2, 5));
+  const child = {
+    ...initial,
+    target_urls: remaining.map((g) => g.id),
+    progress: { completed: 1, total: 3, positions: 0 },
+  };
+  assert.deepEqual(
+    remainingReviewGames(child, games, checked(0, 1, 2)),
+    games.slice(3, 5),
+  );
+});
+
+test('continuing a selected game does not add unrelated imported games', () => {
+  const selected = {
+    ...job,
+    target_urls: [games[8].id],
+    progress: { completed: 0, total: 1, positions: 0 },
+  };
+  assert.deepEqual(remainingReviewGames(selected, games, checked(0, 1, 2, 3, 4)), [
+    games[8],
+  ]);
+  assert.deepEqual(remainingReviewGames(selected, games, checked(0, 1, 2, 3, 4, 8)), []);
+  assert.deepEqual(
+    remainingReviewGames({ ...selected, target_urls: ['missing-game'] }, games, {}),
+    [],
+  );
+  assert.deepEqual(remainingReviewGames(null, games, {}), []);
+});
+
+test('initial targets use imported order without substituting for excluded games', () => {
+  const initial: ReviewJob = {
+    ...job,
+    target_urls: [],
+    data: {
+      profile: { username: job.username },
+      games: importedGames,
+      pace: 'rapid',
+      fetchedAt: job.created_at,
+      archivesRead: 1,
+    },
+  };
+  const replayable = games.filter((g) => g.id !== games[0].id);
+  assert.deepEqual(remainingReviewGames(initial, replayable, {}), games.slice(1, 5));
+});
 
 test('reopening a completed review reads it once without submitting analysis', async (t) => {
   const requests: { url: string; method?: string }[] = [];

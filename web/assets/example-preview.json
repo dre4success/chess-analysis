@@ -1,0 +1,34 @@
+{
+  "url": "https://www.chess.com/game/live/173928199510",
+  "fen": "8/1pqbk1p1/p1p1p2p/P1PpP1P1/1P1P3P/5QP1/6B1/6K1 w - - 2 31",
+  "actual": "g6",
+  "best": "gxh6",
+  "move": 31,
+  "username": "dre4success007",
+  "white": {
+    "rating": 1020,
+    "result": "win",
+    "@id": "https://api.chess.com/pub/player/dre4success007",
+    "username": "Dre4success007",
+    "uuid": "fcf6d474-8bfd-11f1-b746-e79d1e944fae"
+  },
+  "black": {
+    "rating": 916,
+    "result": "resigned",
+    "@id": "https://api.chess.com/pub/player/mhelteo",
+    "username": "mhelteo",
+    "uuid": "e2f35fbc-0556-11f1-a4d6-6302fd1ac551"
+  },
+  "timeControl": "600",
+  "clockSecs": 473.2,
+  "before": {
+    "type": "cp",
+    "value": 1205,
+    "pov": "user"
+  },
+  "after": {
+    "type": "cp",
+    "value": 390,
+    "pov": "user"
+  }
+}

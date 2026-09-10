@@ -1,4 +1,4 @@
-import type { Pace, PlayerData, GameAnalysis } from './chess.ts';
+import type { Pace, PlayerData, GameAnalysis, Game } from './chess.ts';
 import { convertFinding, type SavedReview } from './review-data.ts';
 
 export type ReviewSummary = {
@@ -7,13 +7,27 @@ export type ReviewSummary = {
   pace: Pace;
   status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
   created_at: string;
+  imported_games?: number | null;
+  reviewed_games?: number | null;
+  first_game_at?: number | null;
+  last_game_at?: number | null;
+  findings?: number | null;
   progress: { completed: number; total: number; positions: number };
+};
+export type ReviewPage = {
+  reviews: ReviewSummary[];
+  offset: number;
+  limit: number;
+  has_more: boolean;
+  total: number;
 };
 export type ReviewJob = ReviewSummary & {
   message: string;
   error?: string;
   data?: PlayerData;
   review?: SavedReview;
+  /** Empty for an initial latest-five review; explicit for a continued batch. */
+  target_urls?: string[];
 };
 export type ReviewRequest = {
   username: string;
@@ -57,6 +71,24 @@ export async function api<T>(
   }
   return payload as T;
 }
+
+/** Empty browser history must never request the instance's entire collection. */
+export async function searchedReviews(
+  usernames: string[],
+  {
+    offset = 0,
+    limit = 20,
+    signal,
+  }: { offset?: number; limit?: number; signal?: AbortSignal } = {},
+): Promise<ReviewPage> {
+  if (!usernames.length) return { reviews: [], total: 0, has_more: false, offset, limit };
+  const query = new URLSearchParams({
+    usernames: usernames.join(','),
+    offset: String(offset),
+    limit: String(limit),
+  });
+  return api<ReviewPage>(`/reviews?${query}`, signal);
+}
 export function mappedAnalyses(job: ReviewJob): Record<string, GameAnalysis> {
   return Object.fromEntries(
     (job.review?.games ?? []).map((game) => [
@@ -69,6 +101,21 @@ export function mappedAnalyses(job: ReviewJob): Record<string, GameAnalysis> {
       },
     ]),
   );
+}
+/** Continue only unfinished games in this job's scope, including after repeated stops. */
+export function remainingReviewGames(
+  job: ReviewJob | null,
+  games: Game[],
+  analyses: Record<string, GameAnalysis>,
+): Game[] {
+  if (!job) return [];
+  const targetUrls = job.target_urls?.length
+    ? job.target_urls
+    : job.data
+      ? job.data.games.slice(0, 5).map((g) => g.url)
+      : games.slice(0, 5).map((g) => g.id);
+  const targets = new Set(targetUrls);
+  return games.filter((g) => targets.has(g.id) && !analyses[g.id]);
 }
 export function running(job: ReviewSummary) {
   return job.status === 'queued' || job.status === 'running';

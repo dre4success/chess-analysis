@@ -1,24 +1,21 @@
-'use client';
 import { useMemo, useState } from 'react';
 import { Chess } from 'chess.js';
 import {
   ArrowRight,
   ArrowUpRight,
-  Check,
+  BookOpen,
   ChessKnight,
   Clock3,
-  LoaderCircle,
-  MoveUpRight,
+  Sparkles,
   ShieldCheck,
+  LoaderCircle,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Board } from '@/components/game-review';
-import type { ReviewSummary } from '@/lib/api';
-import { USERNAME_PATTERN } from '@/lib/chess';
+import { Board } from './game-review';
+import { USERNAME_PATTERN, timeLabel } from '../lib/chess';
+import type { ReviewSummary } from '../lib/api';
+import artwork from '../assets/tempo-still-life.jpg';
+import preview from '../assets/example-preview.json';
 
-// From the saved native Stockfish review in public/example/review.json.
-const exampleFen = '8/1pqbk1p1/p1p1p2p/P1PpP1P1/1P1P3P/5QP1/6B1/6K1 w - - 2 31';
 export default function Welcome({
   onConnect,
   onExample,
@@ -26,6 +23,7 @@ export default function Welcome({
   error,
   savedReviews,
   onResume,
+  onLibrary,
 }: {
   onConnect: (name: string) => void;
   onExample: () => void;
@@ -33,50 +31,44 @@ export default function Welcome({
   error: string;
   savedReviews: ReviewSummary[];
   onResume: (id: number) => void;
+  onLibrary: () => void;
 }) {
   const [username, setUsername] = useState('');
-  const [variation, setVariation] = useState<'position' | 'played' | 'better'>(
-    'position',
-  );
+  const [choice, setChoice] = useState<'before' | 'played' | 'better'>('before');
   const position = useMemo(() => {
-    const board = new Chess(exampleFen);
-    if (variation === 'position') return { fen: exampleFen, squares: ['g5'] };
-    const move = board.move(variation === 'played' ? 'g6' : 'gxh6');
-    return { fen: board.fen(), squares: [move.from, move.to] };
-  }, [variation]);
+    const c = new Chess(preview.fen);
+    if (choice === 'before') return { fen: preview.fen, squares: [] as string[] };
+    const m = c.move(choice === 'played' ? preview.actual : preview.best);
+    return { fen: c.fen(), squares: [m.from, m.to] };
+  }, [choice]);
   return (
-    <div className="app-shell welcome-shell">
-      <header className="topbar">
+    <div className="welcome-shell">
+      <header className="topbar welcome-topbar">
         <a className="brand" href="/" aria-label="Tempo home">
           <span className="brand-mark">
-            <ChessKnight size={26} />
+            <ChessKnight size={27} />
           </span>
-          tempo<span className="brand-dot">.</span>
+          tempo<span className="brand-period">.</span>
         </a>
-        <span className="top-note">A space to understand your chess.</span>
-        <a className="help-link" href="#how-it-works">
-          The process <ArrowUpRight size={15} />
-        </a>
+        <span className="top-note">A little reflection. A different game.</span>
+        <button className="text-button" onClick={onLibrary}>
+          <BookOpen size={17} /> Your library <ArrowUpRight size={16} />
+        </button>
       </header>
       <main>
-        <div className="onboarding">
-          <section className="welcome">
+        <section className="welcome-hero">
+          <div className="welcome-copy-column">
             <div className="eyebrow">
-              <span className="live-dot" /> Your personal chess studio
+              <span className="small-star">✳</span> THE ART OF GETTING BETTER
             </div>
             <h1>
-              Find your
+              Every move
               <br />
-              next <span>move.</span>
-              <MoveUpRight className="headline-arrow" aria-hidden="true" />
+              has a <em>story.</em>
             </h1>
-            <p className="welcome-copy">
-              There’s a better player in your last game.
-              <br className="desktop-break" /> Let’s find them.
-            </p>
-            <p className="welcome-detail">
-              Your games, the moments that changed them, and a clearer idea of what to
-              work on next.
+            <p className="hero-lede">
+              Discover what your games are teaching you.
+              <br className="desktop-break" /> Make the next move your best yet.
             </p>
             <form
               className="connect-form"
@@ -85,28 +77,31 @@ export default function Welcome({
                 onConnect(username);
               }}
             >
-              <label htmlFor="username">Your Chess.com username</label>
+              <label htmlFor="username">Start with your Chess.com username</label>
               <div className="connect-row">
-                <div className="input-wrap">
-                  <span className="input-at">@</span>
-                  <Input
-                    id="username"
-                    placeholder="Your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                    maxLength={64}
-                    pattern={USERNAME_PATTERN}
-                    autoComplete="username"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    disabled={busy}
-                  />
-                </div>
-                <Button className="primary-button" type="submit" disabled={busy}>
-                  {busy ? <LoaderCircle className="spin" /> : <ArrowRight size={22} />}
-                  <span>{busy ? 'Importing…' : 'Find my games'}</span>
-                </Button>
+                <span className="input-at">@</span>
+                <input
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Your username"
+                  required
+                  pattern={USERNAME_PATTERN}
+                  maxLength={64}
+                  title="Letters, numbers, underscores and hyphens"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  disabled={busy}
+                />
+                <button className="primary-button" disabled={busy}>
+                  {busy ? (
+                    <LoaderCircle className="spin" size={18} />
+                  ) : (
+                    <ArrowRight size={19} />
+                  )}
+                  <span>{busy ? 'Finding games…' : 'Find my games'}</span>
+                </button>
               </div>
               {error && (
                 <p className="error-message" role="alert">
@@ -115,167 +110,172 @@ export default function Welcome({
               )}
               {busy && (
                 <p className="import-status" role="status">
-                  Importing your recent archives. Your review will continue on the server.
+                  Your completed games are on their way. Your review will keep running on
+                  the server.
                 </p>
               )}
               <p className="privacy-note">
-                <ShieldCheck size={14} /> No password. Just your completed, public games.
+                <ShieldCheck size={14} /> No password. Only completed, public games.
               </p>
             </form>
-            <Button
-              variant="ghost"
-              className="example-button"
+            <button
+              className="example-button text-button"
               onClick={onExample}
               disabled={busy}
             >
-              Take a look around first <ArrowUpRight size={17} />
-            </Button>
-            <div className="studio-signature">
-              <span className="signature-line" />
-              <span>Small discoveries. Stronger chess.</span>
+              Explore a real review <ArrowUpRight size={17} />
+            </button>
+            <div className="hero-signature">
+              <span className="signature-orbit">64</span>
+              <span>
+                Sixty-four squares.
+                <br />
+                <strong>Endless room to grow.</strong>
+              </span>
             </div>
-          </section>
-          <section
-            className="preview-stage"
-            aria-label="Interactive example from a completed game"
-          >
-            <div className="preview-caption">
-              <span className="eyebrow">A real game, already reviewed</span>
-              <span className="pill">Move 31</span>
+          </div>
+          <div className="hero-art">
+            <img
+              src={artwork}
+              alt="Sculptural ivory knight, coral pawn and plum bishop in warm afternoon light"
+              width="1122"
+              height="1402"
+              fetchPriority="high"
+            />
+            <div className="art-topline">
+              <span>THE TEMPO STUDIO</span>
+              <span>01 / REFLECTION</span>
             </div>
-            <div className="preview-board">
-              <div className="board-person">
-                <span className="mini-avatar">M</span>
-                <div>
-                  <strong>mhelteo</strong>
-                  <span>916 · Black</span>
-                </div>
-                <span className="board-match-label">Rapid · 30 min</span>
-              </div>
-              <Board fen={position.fen} highlights={position.squares} />
-              <div className="board-person">
-                <span className="mini-avatar peach">D</span>
-                <div>
-                  <strong>dre4success007</strong>
-                  <span>1020 · White</span>
-                </div>
-                <span className="clock">
-                  <Clock3 size={14} />
-                  07:53
-                </span>
-              </div>
+            <div className="art-caption">
+              <span className="caption-icon">
+                <Sparkles size={19} />
+              </span>
+              <span>
+                Small discoveries.
+                <br />
+                <strong>Stronger chess.</strong>
+              </span>
+              <span className="art-arrow">↗</span>
             </div>
-            <div className="preview-insight">
-              <div className="insight-heading">
-                <span className="insight-icon">
-                  <ChessKnight size={21} />
-                </span>
-                <div>
-                  <span className="eyebrow">A missed opportunity</span>
-                  <h3>One capture. More possibilities.</h3>
-                </div>
-                <Check size={17} />
-              </div>
-              <p>
-                Capturing on h6 keeps a much stronger advantage. Compare the moves on the
-                board.
-              </p>
-              <div className="preview-choices" aria-label="Compare moves in the example">
-                <Button
-                  variant="ghost"
-                  aria-pressed={variation === 'position'}
-                  onClick={() => setVariation('position')}
-                >
-                  Position
-                </Button>
-                <Button
-                  variant="ghost"
-                  aria-pressed={variation === 'played'}
-                  onClick={() => setVariation('played')}
-                >
-                  Played <b>g6</b>
-                </Button>
-                <Button
-                  variant="ghost"
-                  aria-pressed={variation === 'better'}
-                  onClick={() => setVariation('better')}
-                >
-                  Try <b>gxh6</b>
-                  <ArrowUpRight size={14} />
-                </Button>
-              </div>
-            </div>
-            <div className="preview-foot">
-              <span>From a saved Stockfish review</span>
-              <button onClick={onExample} disabled={busy}>
-                Open the full review <ArrowUpRight size={14} />
-              </button>
-            </div>
-          </section>
-        </div>
+          </div>
+        </section>
         {savedReviews.length > 0 && (
-          <section className="saved-reviews">
-            <div className="section-heading">
-              <h2>Your review shelf</h2>
-              <span className="subtle-chip">Saved on this server</span>
+          <section className="returning-section">
+            <div>
+              <span className="eyebrow">YOUR RECENT LOOKUPS</span>
+              <h2>Pick up your thread.</h2>
             </div>
-            <div className="saved-grid">
-              {savedReviews.slice(0, 4).map((review) => (
+            <div className="returning-cards">
+              {savedReviews.slice(0, 2).map((r) => (
                 <button
-                  key={review.id}
-                  className="saved-review"
-                  onClick={() => onResume(review.id)}
+                  className="returning-card"
+                  key={r.id}
+                  onClick={() => onResume(r.id)}
                   disabled={busy}
                 >
-                  <span className="mini-avatar peach">
-                    {review.username[0].toUpperCase()}
-                  </span>
+                  <span className="mini-avatar">{r.username[0].toUpperCase()}</span>
                   <span>
-                    <strong>{review.username}</strong>
+                    <strong>{r.username}</strong>
                     <small>
-                      <span className="chip-pace">{review.pace}</span> ·{' '}
-                      {review.status === 'complete'
-                        ? `${review.progress.completed} games reviewed`
-                        : review.status}{' '}
-                      ·{' '}
-                      {new Date(review.created_at).toLocaleDateString(undefined, {
+                      {r.pace} ·{' '}
+                      {new Date(r.created_at).toLocaleDateString('en-GB', {
                         day: 'numeric',
                         month: 'short',
+                      })}{' '}
+                      at{' '}
+                      {new Date(r.created_at).toLocaleTimeString('en-GB', {
+                        hour: '2-digit',
+                        minute: '2-digit',
                       })}
+                      <br />
+                      Review #{r.id} · {r.reviewed_games ?? r.progress.completed} games
+                      checked
                     </small>
                   </span>
-                  <ArrowUpRight size={18} />
+                  <ArrowUpRight size={19} />
                 </button>
               ))}
             </div>
+            <button className="text-button" onClick={onLibrary}>
+              All saved reviews <ArrowRight size={16} />
+            </button>
           </section>
         )}
-        <section className="welcome-steps" id="how-it-works" aria-label="How Tempo works">
+        <section className="welcome-process" aria-label="How Tempo works">
           <div>
             <span className="step-number">01</span>
-            <div>
-              <h3>Bring your games.</h3>
-              <p>Connect your username. We’ll pull your recent play from Chess.com.</p>
-            </div>
+            <h3>Bring your games.</h3>
+            <p>Your recent play, gathered in one beautiful place.</p>
           </div>
           <div>
             <span className="step-number">02</span>
-            <div>
-              <h3>Meet the turning points.</h3>
-              <p>Stockfish checks your moves and finds positions worth a second look.</p>
-            </div>
+            <h3>Find the turning points.</h3>
+            <p>Engine-checked positions. Patterns you can understand.</p>
           </div>
           <div>
             <span className="step-number">03</span>
-            <div>
-              <h3>Play with perspective.</h3>
-              <p>Explore a better line. Take one useful idea into your next game.</p>
+            <h3>Take an idea with you.</h3>
+            <p>Try a move. Follow the line. Build one better habit.</p>
+          </div>
+        </section>
+        <section className="welcome-example">
+          <div className="example-editorial">
+            <span className="eyebrow">A SMALL MOVE. A NEW POSSIBILITY.</span>
+            <h2>
+              What would
+              <br />
+              <em>you play?</em>
+            </h2>
+            <p>
+              This position comes from a real completed game. Compare the moves, then
+              follow the full continuation in the studio.
+            </p>
+            <div className="example-pills">
+              <span>
+                <Clock3 size={14} />
+                {timeLabel(preview.timeControl)}
+              </span>
+              <span>Move {preview.move}</span>
+              <span>White to move</span>
+            </div>
+            <div className="preview-choices">
+              {(['before', 'played', 'better'] as const).map((c) => (
+                <button
+                  aria-pressed={choice === c}
+                  className={choice === c ? 'selected' : ''}
+                  key={c}
+                  onClick={() => setChoice(c)}
+                >
+                  {c === 'before'
+                    ? 'Before'
+                    : c === 'played'
+                      ? `Played ${preview.actual}`
+                      : `Better ${preview.best}`}
+                </button>
+              ))}
+            </div>
+            <button className="primary-button" onClick={onExample} disabled={busy}>
+              Open the full review <ArrowUpRight size={18} />
+            </button>
+          </div>
+          <div className="example-board-wrap">
+            <div className="example-board-label">
+              <span>{preview.black.username}</span>
+              <span>{preview.black.rating}</span>
+            </div>
+            <Board fen={position.fen} highlights={position.squares} />
+            <div className="example-board-label">
+              <span>{preview.white.username}</span>
+              <span>{preview.white.rating}</span>
             </div>
           </div>
         </section>
       </main>
       <footer className="site-footer">
-        <span>For the player you’re becoming.</span>
+        <a className="brand" href="/">
+          tempo.
+        </a>
+        <span>Made for the player you’re becoming.</span>
         <span>Independent of Chess.com.</span>
       </footer>
     </div>

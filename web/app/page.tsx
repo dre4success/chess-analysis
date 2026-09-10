@@ -1,67 +1,73 @@
-'use client';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowDownRight,
+  ArrowLeft,
   ArrowRight,
   ArrowUpRight,
+  BookOpen,
   ChartNoAxesCombined,
   Check,
   ChessKnight,
   CircleHelp,
-  Clock3,
-  Layers,
   LoaderCircle,
   RefreshCw,
-  Target,
-  TrendingUp,
   X,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import Welcome from '@/components/welcome';
-import GameReview, { Board } from '@/components/game-review';
-import RatingPanelBoundary from '@/components/rating-panel-boundary';
-import { loadModule } from '@/lib/load-module';
+import Welcome from '../components/welcome';
+import GameReview from '../components/game-review';
+import ReviewLibrary from '../components/review-library';
+import StudioOverview from '../components/studio-overview';
+import { useReviewJob } from '../hooks/use-review-job';
+import { useProfileHistory } from '../hooks/use-profile-history';
 import {
-  dateLabel,
+  mappedAnalyses,
+  remainingReviewGames,
+  running,
+  searchedReviews,
+  type ReviewSummary,
+} from '../lib/api';
+import {
   normaliseUsername,
   parseGame,
-  summarise,
-  timeLabel,
   type Game,
   type GameAnalysis,
   type Pace,
   type PlayerData,
-} from '@/lib/chess';
-import { convertFinding, type SavedReview } from '@/lib/review-data';
-import {
-  api,
-  mappedAnalyses,
-  running,
-  watchReview,
-  type ReviewJob,
-  type ReviewRequest,
-  type ReviewSummary,
-} from '@/lib/api';
-const RatingPanel = lazy(() => loadModule(() => import('@/components/rating-panel')));
+} from '../lib/chess';
+import { convertFinding, type SavedReview } from '../lib/review-data';
+import { gameKey, readRoute, routeUrl, type StudioRoute } from '../lib/navigation';
+import type { StudyPosition } from '../lib/study';
+
+type Example = { data: PlayerData; review: SavedReview };
 export default function Home() {
-  const [data, setData] = useState<PlayerData | null>(null),
-    [pace, setPace] = useState<Pace>('rapid'),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(''),
-    [example, setExample] = useState(false),
-    [view, setView] = useState<'overview' | 'review'>('overview'),
-    [selected, setSelected] = useState(''),
-    [selectedPly, setSelectedPly] = useState<number | undefined>(),
-    [analyses, setAnalyses] = useState<Record<string, GameAnalysis>>({}),
-    [engineBusy, setEngineBusy] = useState(false),
-    [engineProgress, setEngineProgress] = useState(''),
-    [engineError, setEngineError] = useState(''),
-    [showAll, setShowAll] = useState(false),
-    [savedReviews, setSavedReviews] = useState<ReviewSummary[]>([]),
-    [jobId, setJobId] = useState<number | null>(null);
-  const currentJob = useRef<number | null>(null);
-  const request = useRef<AbortController | null>(null),
-    generation = useRef(0);
+  const [route, setRoute] = useState<StudioRoute>(() =>
+    readRoute(window.location.search),
+  );
+  const [example, setExample] = useState<Example | null>(null);
+  const [exampleBusy, setExampleBusy] = useState(false);
+  const [localError, setLocalError] = useState('');
+  const [saved, setSaved] = useState<ReviewSummary[]>([]);
+  const { profiles, remember } = useProfileHistory();
+  const historyScope = profiles.join(',');
+  const source = useRef('');
+  const exampleRequest = useRef<AbortController | null>(null);
+  const scrollTarget = useRef<number | null>(null);
+  const pendingFocus = useRef(false);
+  const {
+    job,
+    display,
+    submitting,
+    error,
+    disconnected,
+    start,
+    resume,
+    cancel,
+    disconnect,
+  } = useReviewJob();
+  const data = example?.data ?? display?.data;
+  const busy = submitting || exampleBusy;
+  const hasData = !!data;
+  const active = !!job && running(job) && !disconnected;
+  const reviewData = example?.review ?? display?.review;
   const games = useMemo(
     () =>
       data
@@ -71,216 +77,172 @@ export default function Home() {
         : [],
     [data],
   );
-  const stats = useMemo(() => summarise(games), [games]);
-  useEffect(
-    () => () => {
-      request.current?.abort();
+  const analyses = useMemo<Record<string, GameAnalysis>>(
+    () =>
+      example
+        ? Object.fromEntries(
+            example.review.games.map((g) => [
+              g.url,
+              {
+                id: g.url,
+                source: 'verified' as const,
+                positions: 0,
+                findings: g.findings.map(convertFinding),
+              },
+            ]),
+          )
+        : display
+          ? mappedAnalyses(display)
+          : {},
+    [example, display],
+  );
+  const pace = data?.pace ?? 'rapid';
+  const remaining = remainingReviewGames(job, games, analyses);
+  const selected = games.find((g) => gameKey(g.id) === route.gameId) ?? games[0];
+  const unknownGame =
+    !!route.gameId && !games.some((g) => gameKey(g.id) === route.gameId);
+
+  const navigate = useCallback(
+    (next: StudioRoute, replace = false, restoreTop = true) => {
+      if (!replace)
+        window.history.replaceState(
+          { ...window.history.state, scrollY: window.scrollY },
+          '',
+          window.location.href,
+        );
+      window.history[replace ? 'replaceState' : 'pushState'](
+        { scrollY: restoreTop ? 0 : window.scrollY },
+        '',
+        routeUrl(next),
+      );
+      if (restoreTop) {
+        scrollTarget.current = 0;
+        pendingFocus.current = true;
+      }
+      setRoute(next);
     },
     [],
   );
-  const follow = useCallback(async (jobId: number, controller: AbortController) => {
-    currentJob.current = jobId;
-    setJobId(jobId);
-    window.history.replaceState({}, '', `?review=${jobId}`);
-    try {
-      let lastReview = '';
-      for await (const job of watchReview(jobId, controller.signal)) {
-        setEngineBusy(running(job));
-        setEngineProgress(
-          `${job.message}${job.progress.positions ? ` · ${job.progress.positions} positions checked` : ''}`,
-        );
-        if (job.data) {
-          setPace(job.pace);
-          setExample(false);
-          const next = job.data;
-          setData((old) =>
-            old?.fetchedAt === next.fetchedAt &&
-            old.profile.username === next.profile.username &&
-            old.pace === next.pace
-              ? old
-              : next,
-          );
-          setSelected((old) =>
-            next.games.some((g) => g.url === old) ? old : (next.games[0]?.url ?? ''),
-          );
-          setBusy(false);
-        }
-        const reviewVersion = JSON.stringify(job.review);
-        if (job.review && lastReview !== reviewVersion) {
-          setAnalyses(mappedAnalyses(job));
-          lastReview = reviewVersion;
-        }
-        if (job.status === 'failed') {
-          if (job.data) setEngineError(job.error || job.message);
-          else setError(job.error || job.message);
-        }
-        if (!running(job)) setBusy(false);
-      }
-    } catch (e) {
-      if (!controller.signal.aborted) {
-        setEngineError(
-          `Connection interrupted. Review #${jobId} is saved on the server. Reconnect to check its progress.`,
-        );
-        setError(e instanceof Error ? e.message : 'Could not reach the review server.');
-        setBusy(false);
-        setEngineBusy(false);
-      }
-    }
+  useEffect(() => {
+    const pop = () => {
+      scrollTarget.current = window.history.state?.scrollY ?? 0;
+      pendingFocus.current = true;
+      setRoute(readRoute(window.location.search));
+    };
+    window.addEventListener('popstate', pop);
+    return () => window.removeEventListener('popstate', pop);
   }, []);
-  const resumeJob = useCallback(
-    (id: number) => {
-      generation.current++;
-      request.current?.abort();
-      const controller = new AbortController();
-      request.current = controller;
-      setError('');
-      setEngineError('');
-      setBusy(true);
-      setAnalyses({});
-      setView('overview');
-      void follow(id, controller);
-    },
-    [follow],
-  );
-  const startJob = useCallback(
-    async (input: ReviewRequest, clear: boolean) => {
-      generation.current++;
-      request.current?.abort();
-      const controller = new AbortController();
-      request.current = controller;
-      setBusy(true);
-      setError('');
-      setEngineError('');
-      try {
-        const job = await api<ReviewJob>('/reviews', controller.signal, input);
-        if (controller.signal.aborted) return null;
-        if (clear) {
-          setAnalyses({});
-          setView('overview');
-          setShowAll(false);
+  useEffect(() => {
+    if (scrollTarget.current === null) return;
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollTarget.current ?? 0, behavior: 'instant' });
+      scrollTarget.current = null;
+      if (pendingFocus.current) {
+        const target = document.querySelector<HTMLElement>(
+          route.view === 'review' ? '.board-keyboard' : 'main h1, main h2',
+        );
+        if (target) {
+          target.setAttribute('tabindex', '-1');
+          if (route.view === 'review') target.setAttribute('tabindex', '0');
+          target.focus({ preventScroll: true });
+          pendingFocus.current = false;
         }
-        void follow(job.id, controller);
-        return { username: job.username, reviewId: job.id, pace: job.pace };
-      } catch (e) {
-        if (!controller.signal.aborted) {
-          setBusy(false);
-          setError((e as Error).message);
-        }
-        return null;
       }
-    },
-    [follow],
-  );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [route.view, route.gameId, hasData, exampleBusy]);
+
+  useEffect(() => {
+    if (route.reviewId) {
+      const key = `review:${route.reviewId}`;
+      if (source.current === key) return;
+      source.current = key;
+      exampleRequest.current?.abort();
+      setExample(null);
+      setExampleBusy(false);
+      resume(route.reviewId);
+    } else if (route.example && source.current !== 'example') {
+      source.current = 'example';
+      disconnect(true);
+      const c = new AbortController();
+      exampleRequest.current?.abort();
+      exampleRequest.current = c;
+      setExampleBusy(true);
+      setLocalError('');
+      Promise.all([
+        fetch('/example/games.json', { signal: c.signal }).then((r) => {
+          if (!r.ok) throw new Error('Could not load the example games.');
+          return r.json() as Promise<{ games: PlayerData['games'] }>;
+        }),
+        fetch('/example/review.json', { signal: c.signal }).then((r) => {
+          if (!r.ok) throw new Error('Could not load the example review.');
+          return r.json() as Promise<SavedReview>;
+        }),
+      ])
+        .then(([g, r]) => {
+          if (c.signal.aborted) return;
+          setExample({
+            review: r,
+            data: {
+              profile: { username: r.user },
+              games: g.games.toSorted((a, b) => b.end_time - a.end_time),
+              pace: 'rapid',
+              fetchedAt: r.generated,
+              archivesRead: 1,
+            },
+          });
+        })
+        .catch((e) => {
+          if (!c.signal.aborted) {
+            source.current = '';
+            setLocalError(e.message);
+            navigate({ view: 'welcome' }, true);
+          }
+        })
+        .finally(() => {
+          if (!c.signal.aborted) setExampleBusy(false);
+        });
+    } else if (!route.example && source.current) {
+      source.current = '';
+      exampleRequest.current?.abort();
+      disconnect(true);
+      setExample(null);
+      setExampleBusy(false);
+    }
+  }, [route.reviewId, route.example, resume, disconnect, navigate]);
+  useEffect(() => () => exampleRequest.current?.abort(), []);
+  useEffect(() => {
+    if (route.view !== 'welcome') return;
+    const c = new AbortController();
+    searchedReviews(profiles, { limit: 4, signal: c.signal })
+      .then((p) => {
+        if (!c.signal.aborted) setSaved(p.reviews);
+      })
+      .catch(() => {});
+    return () => c.abort();
+  }, [route.view, profiles]);
+
   const connect = useCallback(
     async (name: string, nextPace: Pace = 'rapid') => {
       try {
-        return await startJob(
-          { username: normaliseUsername(name), pace: nextPace },
-          true,
-        );
+        const username = normaliseUsername(name);
+        setLocalError('');
+        exampleRequest.current?.abort();
+        setExampleBusy(false);
+        const next = await start({ username, pace: nextPace });
+        if (!next) return null;
+        remember(next.username);
+        source.current = `review:${next.id}`;
+        setExample(null);
+        navigate({ view: 'overview', reviewId: next.id });
+        return { username: next.username, reviewId: next.id, pace: next.pace };
       } catch (e) {
-        setError((e as Error).message);
+        setLocalError((e as Error).message);
         return null;
       }
     },
-    [startJob],
+    [start, navigate, remember],
   );
-  async function runAnalysis(batch: Game[]) {
-    if (!data || !batch.length) return;
-    if (currentJob.current === null) {
-      await connect(data.profile.username, pace);
-      return;
-    }
-    await startJob(
-      {
-        username: data.profile.username,
-        pace,
-        parent_id: currentJob.current,
-        game_urls: batch.map((g) => g.id),
-      },
-      false,
-    );
-  }
-  async function cancelAnalysis() {
-    if (currentJob.current === null) return;
-    try {
-      await api(`/reviews/${currentJob.current}/cancel`, undefined, {});
-    } catch (e) {
-      setEngineError((e as Error).message);
-    }
-  }
-  useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get('review');
-    const controller = new AbortController();
-    if (id && /^[1-9][0-9]*$/.test(id)) {
-      void Promise.resolve().then(() => {
-        if (!controller.signal.aborted) resumeJob(Number(id));
-      });
-    }
-    return () => controller.abort();
-  }, [resumeJob]);
-  useEffect(() => {
-    if (data) return;
-    const controller = new AbortController();
-    api<{ reviews: ReviewSummary[] }>('/reviews', controller.signal)
-      .then((result) => {
-        if (!controller.signal.aborted) setSavedReviews(result.reviews);
-      })
-      .catch(() => {});
-    return () => controller.abort();
-  }, [data]);
-  async function loadExample() {
-    const id = ++generation.current;
-    request.current?.abort();
-    currentJob.current = null;
-    setJobId(null);
-    window.history.replaceState({}, '', '/');
-    setBusy(true);
-    setError('');
-    setEngineBusy(false);
-    try {
-      const [g, r] = await Promise.all([
-        fetch('/example/games.json').then((r) => {
-          if (!r.ok) throw new Error('The example could not be loaded.');
-          return r.json() as Promise<{ games: PlayerData['games'] }>;
-        }),
-        fetch('/example/review.json').then((r) => {
-          if (!r.ok) throw new Error('The example review could not be loaded.');
-          return r.json() as Promise<SavedReview>;
-        }),
-      ]);
-      if (id !== generation.current) return;
-      const next: PlayerData = {
-        profile: { username: r.user },
-        games: g.games.sort((a, b) => b.end_time - a.end_time),
-        pace: 'rapid',
-        fetchedAt: r.generated,
-        archivesRead: 1,
-      };
-      const mapped: Record<string, GameAnalysis> = {};
-      for (const game of r.games) {
-        mapped[game.url] = {
-          id: game.url,
-          source: 'verified',
-          positions: 0,
-          findings: game.findings.map(convertFinding),
-        };
-      }
-      if (id !== generation.current) return;
-      setData(next);
-      setAnalyses(mapped);
-      setPace('rapid');
-      setExample(true);
-      setView('overview');
-      setShowAll(false);
-      setEngineError('');
-      setSelected(next.games[0]?.url ?? '');
-    } catch (e) {
-      if (id === generation.current) setError((e as Error).message);
-    } finally {
-      if (id === generation.current) setBusy(false);
-    }
-  }
   useEffect(() => {
     const context = (
       document as unknown as {
@@ -295,8 +257,7 @@ export default function Home() {
           {
             name: 'analyse_chess_profile',
             title: 'Analyse a Chess.com profile',
-            description:
-              'Fetch completed games for a username, show the overview, and start Stockfish checks on the latest five games.',
+            description: 'Import completed games and start a saved native review.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -316,15 +277,10 @@ export default function Home() {
                   (typeof args.pace !== 'string' ||
                     !['rapid', 'blitz', 'bullet'].includes(args.pace)))
               )
-                throw new Error('Provide a valid username and pace.');
+                throw new Error('Provide a username and supported pace.');
               const result = await connect(args.username, (args.pace ?? 'rapid') as Pace);
               if (!result)
-                throw new Error(
-                  'The profile could not be loaded. See the visible error.',
-                );
-              await new Promise<void>((resolve) =>
-                requestAnimationFrame(() => resolve()),
-              );
+                throw new Error('The review could not start. See the visible error.');
               return { ...result, moveAnalysis: 'started' };
             },
           },
@@ -334,608 +290,419 @@ export default function Home() {
     } catch {}
     return () => life.abort();
   }, [connect]);
-  function reset() {
-    generation.current++;
-    request.current?.abort();
-    currentJob.current = null;
-    setJobId(null);
-    window.history.replaceState({}, '', '/');
-    setData(null);
-    setBusy(false);
-    setEngineBusy(false);
-    setError('');
+  function home() {
+    source.current = '';
+    exampleRequest.current?.abort();
+    disconnect(true);
+    setExample(null);
+    setLocalError('');
+    setExampleBusy(false);
+    navigate({ view: 'welcome' });
   }
-  function review(game: Game, ply?: number) {
-    setSelected(game.id);
-    setSelectedPly(ply);
-    setView('review');
+  function openReview(id: number) {
+    setLocalError('');
+    navigate({ view: 'overview', reviewId: id });
   }
-  const checked = games.filter((g) => analyses[g.id]),
-    findings = checked.flatMap((g) =>
-      analyses[g.id].findings.map((f) => ({ game: g, f })),
-    ),
-    priority = findings
-      .slice()
-      .sort((a, b) => (b.f.loss ?? 100000) - (a.f.loss ?? 100000))[0];
-  const selectedGame = games.find((g) => g.id === selected) ?? games[0];
-  const graph = games.toReversed().map((g, i) => ({
-    index: i + 1,
-    rating: g.rating,
-    date: dateLabel(g.date),
-    opponent: g.opponent,
-  }));
-  if (!data)
+  function library() {
+    navigate({ view: 'library', reviewId: route.reviewId, example: route.example });
+  }
+  function inspect(game: Game, ply?: number) {
+    navigate({
+      view: 'review',
+      reviewId: route.reviewId,
+      example: route.example,
+      gameId: gameKey(game.id),
+      position: ply ? { ply: ply - 1, mode: 'before', findingPly: ply } : undefined,
+    });
+  }
+  function move(position: StudyPosition) {
+    navigate({ ...route, gameId: gameKey(selected.id), position }, true, false);
+  }
+  async function analyse(batch: Game[]) {
+    if (!data || !batch.length) return;
+    if (!job || example) {
+      await connect(data.profile.username, pace);
+      return;
+    }
+    const next = await start({
+      username: data.profile.username,
+      pace,
+      parent_id: job.id,
+      game_urls: batch.map((g) => g.id),
+    });
+    if (next) {
+      remember(next.username);
+      source.current = `review:${next.id}`;
+      navigate({ ...route, reviewId: next.id, example: undefined }, true, false);
+    }
+  }
+  const problem = localError || error;
+  if (route.view === 'welcome' || (!data && route.view !== 'library'))
     return (
       <Welcome
-        onConnect={(name) => void connect(name)}
-        onExample={() => void loadExample()}
+        onConnect={(n) => void connect(n)}
+        onExample={() => navigate({ view: 'overview', example: true })}
         busy={busy}
-        error={error}
-        savedReviews={savedReviews}
-        onResume={resumeJob}
+        error={problem}
+        savedReviews={saved.filter((review) =>
+          profiles.includes(review.username.toLowerCase()),
+        )}
+        onResume={openReview}
+        onLibrary={library}
       />
     );
   return (
-    <div className="app-shell dashboard-shell">
+    <div
+      className={`app-shell studio-shell ${route.view === 'review' ? 'study-shell' : ''}`}
+    >
       <header className="topbar dashboard-topbar">
+        <a
+          href="/"
+          className="brand"
+          aria-label="Tempo home"
+          onClick={(e) => {
+            e.preventDefault();
+            home();
+          }}
+        >
+          <span className="brand-mark">
+            <ChessKnight size={26} />
+          </span>
+          tempo<span className="brand-period">.</span>
+        </a>
+        <nav className="main-nav" aria-label="Studio navigation">
+          <button
+            aria-current={route.view === 'overview' ? 'page' : undefined}
+            className={route.view === 'overview' ? 'active' : ''}
+            disabled={!data}
+            onClick={() =>
+              navigate({
+                view: 'overview',
+                reviewId: route.reviewId,
+                example: route.example,
+              })
+            }
+          >
+            <ChartNoAxesCombined size={17} /> Overview
+          </button>
+          <button
+            aria-current={route.view === 'review' ? 'page' : undefined}
+            className={route.view === 'review' ? 'active' : ''}
+            disabled={!games.length}
+            onClick={() => inspect(selected)}
+          >
+            <ChessKnight size={17} /> Study room
+          </button>
+          <button
+            aria-current={route.view === 'library' ? 'page' : undefined}
+            className={route.view === 'library' ? 'active' : ''}
+            onClick={library}
+          >
+            <BookOpen size={17} /> Library
+          </button>
+        </nav>
+        <button className="account-button" onClick={home}>
+          <span className="mini-avatar">
+            {data?.profile.username[0].toUpperCase() ?? 'T'}
+          </span>
+          <span>{data?.profile.username ?? 'Your studio'}</span>
+          <ArrowUpRight size={16} />
+        </button>
+      </header>
+      <main className={`dashboard ${route.view === 'review' ? 'study-dashboard' : ''}`}>
+        {route.view === 'library' ? (
+          <ReviewLibrary
+            key={historyScope}
+            profiles={profiles}
+            onResume={openReview}
+            onSearch={home}
+          />
+        ) : (
+          <>
+            <div
+              className={`dashboard-heading ${route.view === 'review' ? 'compact' : ''}`}
+            >
+              <div>
+                {route.view === 'overview' ? (
+                  <>
+                    <span className="eyebrow">
+                      <span className="live-dot" />
+                      {example
+                        ? 'A REAL REVIEW, READY TO EXPLORE'
+                        : 'YOUR PERSONAL CHESS STUDIO'}
+                    </span>
+                    <h1>
+                      Your chess,
+                      <br className="mobile-break" /> <em>in perspective.</em>
+                    </h1>
+                    <p>A little reflection today. A more thoughtful move tomorrow.</p>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="back-link"
+                      onClick={() =>
+                        navigate({
+                          view: 'overview',
+                          reviewId: route.reviewId,
+                          example: route.example,
+                        })
+                      }
+                    >
+                      <ArrowLeft size={16} /> Back to overview
+                    </button>
+                    <h1>
+                      The study room<span className="heading-dot">.</span>
+                    </h1>
+                  </>
+                )}
+              </div>
+              <div className="heading-actions">
+                <div className="pace-switch" aria-label="Time format">
+                  {(['rapid', 'blitz', 'bullet'] as Pace[]).map((p) => (
+                    <button
+                      key={p}
+                      aria-pressed={pace === p}
+                      disabled={busy}
+                      onClick={() => void connect(data!.profile.username, p)}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="icon-button"
+                  title="Import the latest games"
+                  aria-label="Refresh games"
+                  disabled={busy}
+                  onClick={() => void connect(data!.profile.username, pace)}
+                >
+                  <RefreshCw size={18} className={busy ? 'spin' : ''} />
+                </button>
+              </div>
+            </div>
+            {example && (
+              <div className="example-notice">
+                <span>
+                  <SparkIcon /> You’re exploring {games.length} completed games with a
+                  saved review.
+                </span>
+                <button onClick={() => void connect(data!.profile.username, pace)}>
+                  Import your latest games <ArrowRight size={15} />
+                </button>
+              </div>
+            )}
+            {job && (active || job.status === 'cancelled' || job.status === 'failed') && (
+              <div
+                className={`job-banner ${job.status === 'failed' ? 'job-failed' : ''}`}
+                role="status"
+              >
+                <span className="job-icon">
+                  {active ? (
+                    <LoaderCircle size={19} className="spin" />
+                  ) : (
+                    <Check size={19} />
+                  )}
+                </span>
+                <div>
+                  <strong>
+                    {job.status === 'queued'
+                      ? 'Your review is in the queue'
+                      : job.status === 'cancelled'
+                        ? 'Review stopped. Your finished games are saved.'
+                        : job.status === 'failed'
+                          ? 'This review needs another try.'
+                          : job.message}
+                  </strong>
+                  <span>
+                    {job.progress.completed} of{' '}
+                    {job.progress.total ||
+                      job.target_urls?.length ||
+                      Math.min(5, games.length) ||
+                      5}{' '}
+                    games saved in this batch
+                    {active ? ' · You can keep exploring while we work.' : ''}
+                  </span>
+                </div>
+                {active && (
+                  <button
+                    className="text-button"
+                    onClick={() => void cancel()}
+                    aria-label="Stop analysis and save completed games"
+                  >
+                    <X size={16} /> Stop
+                  </button>
+                )}
+                {['cancelled', 'failed'].includes(job.status) &&
+                  !busy &&
+                  remaining.length > 0 && (
+                    <button
+                      className="text-button"
+                      onClick={() => void analyse(remaining)}
+                    >
+                      Continue <ArrowRight size={16} />
+                    </button>
+                  )}
+              </div>
+            )}
+            {busy && (
+              <p className="loading-line" role="status">
+                <LoaderCircle size={17} className="spin" /> Finding your completed games…
+              </p>
+            )}
+            {problem && (
+              <div className="error-message" role="alert">
+                {problem}{' '}
+                {job && (
+                  <button onClick={() => resume(job.id)}>
+                    Reconnect to saved review
+                  </button>
+                )}
+              </div>
+            )}
+            {data?.warning && <p className="data-note">{data.warning}</p>}
+            {data && data.games.length > games.length && (
+              <p className="data-note">
+                {data.games.length - games.length} games could not be safely replayed and
+                were excluded.
+              </p>
+            )}
+            {!games.length ? (
+              <div className="empty-state">
+                <ChessKnight size={40} />
+                <h2>No recent rated {pace} games found.</h2>
+                <p>
+                  Choose another time format or return after your next completed game.
+                </p>
+              </div>
+            ) : route.view === 'review' && unknownGame ? (
+              <div className="empty-state" role="status">
+                <BookOpen size={36} />
+                <h2>This game isn’t in this review.</h2>
+                <p>
+                  The saved position refers to a different game. Choose one from this
+                  review to continue.
+                </p>
+                <button
+                  className="ink-button"
+                  onClick={() =>
+                    navigate({
+                      view: 'overview',
+                      reviewId: route.reviewId,
+                      example: route.example,
+                    })
+                  }
+                >
+                  Choose a game <ArrowRight size={17} />
+                </button>
+              </div>
+            ) : route.view === 'review' ? (
+              <GameReview
+                key={selected.id}
+                game={selected}
+                games={games}
+                analyses={analyses}
+                analysis={analyses[selected.id]}
+                onSelect={(id) => {
+                  const g = games.find((g) => g.id === id);
+                  if (g) inspect(g);
+                }}
+                position={route.position}
+                onPositionChange={move}
+                onAnalyse={() => void analyse([selected])}
+                busy={active}
+                progress={job?.message ?? ''}
+              />
+            ) : (
+              <StudioOverview
+                games={games}
+                analyses={analyses}
+                pace={pace}
+                onReview={inspect}
+                digestUrl={
+                  !example && display?.review
+                    ? `/api/reviews/${display.id}/digest`
+                    : undefined
+                }
+                busy={active}
+                canContinue={!example && remaining.length > 0}
+                onContinue={() => void analyse(remaining)}
+              />
+            )}
+            <details className="review-method">
+              <summary>
+                <CircleHelp size={16} /> How this review works
+              </summary>
+              <div>
+                <p>
+                  Trends use up to 40 completed, rated standard games from the latest
+                  eight active months. Ratings are recorded in each game. Chess.com public
+                  data can take time to update.
+                </p>
+                <p>
+                  The latest five games are checked automatically. Each position uses
+                  150,000 scan nodes and 1,000,000 confirmation nodes with native
+                  Stockfish. Up to three substantial mistakes are selected per game. A
+                  bounded search can miss mistakes; an empty review does not mean perfect
+                  play.
+                </p>
+                <p>
+                  New analysis includes the game’s move history. Older saved reviews
+                  retain their original analysis. Engine verdicts and proposed tactical
+                  explanations have different limits: compare the actual continuation with
+                  the alternative and treat small pattern samples as observations.
+                </p>
+                <p>
+                  Reviews stay saved on this server. Your library shows players you’ve
+                  looked up in this browser. Closing a tab stops polling, and an explicit
+                  Stop keeps completed results.{' '}
+                  <a
+                    href="https://support.chess.com/en/articles/9650547-what-is-the-pubapi-and-how-do-i-use-it"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Chess.com public data
+                  </a>{' '}
+                  ·{' '}
+                  <a
+                    href="https://github.com/official-stockfish/Stockfish/tree/sf_18"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Stockfish source & licence
+                  </a>
+                </p>
+                {reviewData?.generated && (
+                  <p>
+                    Review generated {new Date(reviewData.generated).toLocaleString()}.
+                  </p>
+                )}
+              </div>
+            </details>
+          </>
+        )}
+      </main>
+      <footer className="site-footer">
         <a
           className="brand"
           href="/"
           onClick={(e) => {
             e.preventDefault();
-            reset();
+            home();
           }}
         >
-          <span className="brand-mark">
-            <ChessKnight size={25} />
-          </span>
-          tempo<span className="brand-dot">.</span>
+          tempo.
         </a>
-        <nav className="main-nav" aria-label="Review navigation">
-          <Button
-            variant="ghost"
-            className={view === 'overview' ? 'active' : ''}
-            onClick={() => setView('overview')}
-          >
-            <ChartNoAxesCombined size={16} /> Overview
-          </Button>
-          <Button
-            variant="ghost"
-            className={view === 'review' ? 'active' : ''}
-            onClick={() => setView('review')}
-            disabled={!games.length}
-          >
-            <ChessKnight size={16} /> Game review
-          </Button>
-        </nav>
-        <Button variant="ghost" className="account-button" onClick={reset}>
-          <span className="mini-avatar peach">
-            {data.profile.username[0].toUpperCase()}
-          </span>
-          <span>{data.profile.username}</span>
-          <span className="account-change">Change</span>
-        </Button>
-      </header>
-      <main className="dashboard">
-        <div className={`dashboard-heading ${view === 'review' ? 'compact' : ''}`}>
-          <div>
-            {view === 'overview' ? (
-              <>
-                <div className="eyebrow">
-                  <span className="live-dot" />
-                  {example ? 'Example review' : 'Reviewing ' + data.profile.username}
-                </div>
-                <h1>A little reflection. A better next move.</h1>
-                <p>
-                  {games.length} completed, rated {pace} games
-                  {games.length > 0
-                    ? `, ${dateLabel(games.at(-1)!.date)} to ${dateLabel(games[0].date)}`
-                    : ''}
-                </p>
-              </>
-            ) : (
-              <p>Pick a game, replay it, and see what the engine found.</p>
-            )}
-          </div>
-          <div className="heading-actions">
-            <div className="pace-switch" aria-label="Time format">
-              {(['rapid', 'blitz', 'bullet'] as Pace[]).map((p) => (
-                <Button
-                  key={p}
-                  variant="ghost"
-                  aria-pressed={pace === p}
-                  className={pace === p ? 'active' : ''}
-                  disabled={busy}
-                  onClick={() => void connect(data.profile.username, p)}
-                >
-                  {p}
-                </Button>
-              ))}
-            </div>
-            <Button
-              variant="outline"
-              className="refresh-button"
-              aria-label="Refresh games"
-              onClick={() => void connect(data.profile.username, pace)}
-              disabled={busy}
-            >
-              <RefreshCw size={17} className={busy ? 'spin' : ''} />
-            </Button>
-          </div>
-        </div>
-        {example && (
-          <div className="notice">
-            <span>You’re exploring 12 real games and their saved Stockfish review.</span>
-            <Button variant="ghost" onClick={() => void connect(data.profile.username)}>
-              Pull the latest games <ArrowRight size={15} />
-            </Button>
-          </div>
-        )}
-        {busy && (
-          <div className="notice" role="status">
-            <span>
-              <LoaderCircle size={16} className="spin" /> Fetching your public profile and
-              recent archives…
-            </span>
-          </div>
-        )}
-        {error && (
-          <div className="error-message" role="alert">
-            {error}
-          </div>
-        )}
-        {data.warning && <p className="data-note">{data.warning}</p>}
-        {data.games.length > games.length && (
-          <p className="data-note">
-            {data.games.length - games.length} games could not be safely replayed and are
-            excluded.
-          </p>
-        )}
-        {engineError && (
-          <div className="error-message" role="alert">
-            {engineError}{' '}
-            {jobId && (
-              <Button variant="ghost" onClick={() => resumeJob(jobId)}>
-                Reconnect to saved review
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              onClick={() =>
-                void runAnalysis(games.filter((g) => !analyses[g.id]).slice(0, 5))
-              }
-            >
-              Retry analysis
-            </Button>
-          </div>
-        )}
-        {!games.length ? (
-          <div className="empty-state">
-            <ChessKnight size={42} />
-            <h2>No recent rated {pace} games found.</h2>
-            <p>Try another time format, or come back after your next completed game.</p>
-          </div>
-        ) : view === 'review' ? (
-          <GameReview
-            key={`${selectedGame.id}:${analyses[selectedGame.id] ? 'checked' : 'pending'}:${selectedPly ?? ''}`}
-            game={selectedGame}
-            games={games}
-            analyses={analyses}
-            onSelect={(id) => {
-              setSelected(id);
-              setSelectedPly(undefined);
-            }}
-            focusPly={selectedPly}
-            analysis={analyses[selectedGame.id]}
-            busy={engineBusy}
-            progress={engineProgress}
-            onAnalyse={() => void runAnalysis([selectedGame])}
-          />
-        ) : (
-          <>
-            <section className="focus-panel">
-              <button
-                className="focus-board"
-                onClick={() => review(priority?.game ?? games[0], priority?.f.ply)}
-                aria-label="Open the featured position in game review"
-              >
-                <div className="spotlight-label">
-                  <span className="live-dot" />
-                  {priority ? 'A moment to revisit' : 'Your latest game'}
-                  <ArrowUpRight size={16} />
-                </div>
-                <Board
-                  fen={priority?.f.beforeFen ?? games[0].moves.at(-1)!.after}
-                  flipped={(priority?.game ?? games[0]).colour === 'b'}
-                />
-                <div className="spotlight-caption">
-                  <span>vs {(priority?.game ?? games[0]).opponent}</span>
-                  <span>
-                    {priority
-                      ? `Move ${Math.ceil(priority.f.ply / 2)} · Your turn`
-                      : dateLabel(games[0].date)}
-                  </span>
-                </div>
-              </button>
-              <div className="focus-copy">
-                <div className="section-heading">
-                  <span className="eyebrow">
-                    <Target size={15} /> Your next focus
-                  </span>
-                </div>
-                <h2>
-                  {priority
-                    ? priority.f.title
-                    : stats.timeouts >= 2
-                      ? 'Keep an eye on your clock.'
-                      : engineBusy
-                        ? 'Your next insight is on its way.'
-                        : 'Build on what you’ve learned.'}
-                </h2>
-                <p>
-                  {priority
-                    ? `${findings.length} key moments across ${checked.length} checked games. Start with a position where the engine found a stronger move.`
-                    : stats.timeouts >= 2
-                      ? `${stats.timeouts} of your ${games.length} games ended in a loss on time. Practise checking your remaining time after each opponent move.`
-                      : engineBusy
-                        ? 'Stockfish is checking your moves. Your coaching priorities will appear here as each game finishes.'
-                        : 'Review one game slowly. Look at checks, captures and threats before comparing your choice with the engine.'}
-                </p>
-                {priority ? (
-                  <div className="focus-example">
-                    <span>
-                      Move {Math.ceil(priority.f.ply / 2)} against{' '}
-                      {priority.game.opponent}
-                    </span>
-                    <strong>
-                      {priority.f.actual}
-                      <ArrowRight size={18} />
-                      <span className="better">{priority.f.best}</span>
-                    </strong>
-                    <span>{priority.f.title}</span>
-                  </div>
-                ) : (
-                  <div className="focus-example">
-                    <ChessKnight size={32} />
-                    <span>A useful review starts with a real position.</span>
-                  </div>
-                )}
-                <Button
-                  className="focus-button"
-                  onClick={() => review(priority?.game ?? games[0], priority?.f.ply)}
-                >
-                  {priority ? 'Explore this moment' : 'Review your latest game'}
-                  <ArrowRight size={17} />
-                </Button>
-                <div className="engine-status" role="status">
-                  {engineBusy ? (
-                    <LoaderCircle size={13} className="spin" />
-                  ) : (
-                    <Check size={13} />
-                  )}
-                  <span>
-                    {engineBusy
-                      ? engineProgress
-                      : `${checked.length} of ${games.length} games checked`}
-                  </span>
-                  {engineBusy && (
-                    <button
-                      className="cancel-engine"
-                      aria-label="Stop analysis and save completed games"
-                      onClick={() => void cancelAnalysis()}
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-                {!engineBusy && checked.length < Math.min(5, games.length) && (
-                  <Button
-                    variant="link"
-                    className="resume-analysis"
-                    onClick={() =>
-                      void runAnalysis(
-                        games.filter((g) => !analyses[g.id]).slice(0, 5 - checked.length),
-                      )
-                    }
-                  >
-                    Continue analysis
-                  </Button>
-                )}
-              </div>
-            </section>
-            <section className="metrics" aria-label="Your game statistics">
-              <div className="metric">
-                <div className="metric-label">
-                  Latest recorded rating <TrendingUp size={16} />
-                </div>
-                <div className="metric-value">
-                  {stats.rating?.toLocaleString()}
-                  <span
-                    className={`metric-change ${(stats.change ?? 0) >= 0 ? 'positive' : 'negative'}`}
-                  >
-                    {stats.change !== null ? (
-                      <>
-                        {stats.change >= 0 ? (
-                          <ArrowUpRight size={15} />
-                        ) : (
-                          <ArrowDownRight size={15} />
-                        )}{' '}
-                        {stats.change >= 0 ? '+' : ''}
-                        {stats.change}
-                      </>
-                    ) : (
-                      '—'
-                    )}
-                  </span>
-                </div>
-                <p>Rating recorded in your latest game</p>
-              </div>
-              <div className="metric">
-                <div className="metric-label">
-                  Win rate <Target size={16} />
-                </div>
-                <div className="metric-value">
-                  {stats.winRate}
-                  <span className="value-unit">%</span>
-                </div>
-                <p className="metric-results">
-                  <span>{stats.wins} wins</span>
-                  <span>{stats.draw} draws</span>
-                  <span>{stats.loss} losses</span>
-                </p>
-              </div>
-              <div className="metric">
-                <div className="metric-label">
-                  Games imported <Layers size={16} />
-                </div>
-                <div className="metric-value">
-                  {games.length}
-                  <span className="value-unit">games</span>
-                </div>
-                <p>{checked.length} checked with Stockfish</p>
-              </div>
-              <div className="metric">
-                <div className="metric-label">
-                  Playing both sides <ChessKnight size={16} />
-                </div>
-                <div className="colour-results">
-                  {stats.colours.map((c) => (
-                    <div key={c.colour}>
-                      <span
-                        className={`colour-dot ${c.colour === 'w' ? 'white-dot' : 'black-dot'}`}
-                      />
-                      <strong>
-                        {c.games ? `${Math.round((c.wins / c.games) * 100)}%` : '—'}
-                      </strong>
-                      <small>
-                        {c.colour === 'w' ? 'White' : 'Black'} · {c.games} games
-                      </small>
-                    </div>
-                  ))}
-                </div>
-                <p>Win rate by piece colour</p>
-              </div>
-            </section>
-            <div className="overview-grid">
-              <RatingPanelBoundary>
-                <Suspense
-                  fallback={
-                    <section className="panel rating-panel" role="status">
-                      Loading your rating trend…
-                    </section>
-                  }
-                >
-                  <RatingPanel graph={graph} pace={pace} change={stats.change} />
-                </Suspense>
-              </RatingPanelBoundary>
-              <section className="panel games-panel">
-                <div className="section-heading">
-                  <h2>Your recent games</h2>
-                  <span className="subtle-chip chip-pace">
-                    <Clock3 size={13} /> {pace}
-                  </span>
-                </div>
-                <div className="game-table-wrap">
-                  <table className="game-table">
-                    <thead>
-                      <tr>
-                        <th>Opponent</th>
-                        <th>Result</th>
-                        <th>Opening</th>
-                        <th>Played</th>
-                        <th>
-                          <span className="sr-only">Review</span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {games.slice(0, showAll ? games.length : 6).map((g) => (
-                        <tr key={g.id}>
-                          <td>
-                            <button
-                              className="opponent-button"
-                              aria-label={`Review game against ${g.opponent}`}
-                              onClick={() => review(g)}
-                            >
-                              <span
-                                className={`colour-dot ${g.colour === 'w' ? 'white-dot' : 'black-dot'}`}
-                                aria-hidden="true"
-                              />
-                              <span>
-                                <strong>{g.opponent}</strong>
-                                <small>
-                                  {g.opponentRating} · {timeLabel(g.timeControl)}
-                                </small>
-                              </span>
-                            </button>
-                          </td>
-                          <td>
-                            <span className={`result-badge ${g.result}`}>
-                              {g.result === 'win'
-                                ? 'Won'
-                                : g.result === 'loss'
-                                  ? 'Lost'
-                                  : 'Draw'}
-                            </span>
-                          </td>
-                          <td className="table-opening">
-                            <span>{g.opening}</span>
-                            <small>
-                              {analyses[g.id]
-                                ? `${analyses[g.id].findings.length} key moments`
-                                : 'Ready to review'}
-                            </small>
-                          </td>
-                          <td className="table-date">{dateLabel(g.date)}</td>
-                          <td>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Review game against ${g.opponent}`}
-                              onClick={() => review(g)}
-                            >
-                              <ArrowUpRight size={18} />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {games.length > 6 && (
-                  <Button
-                    variant="ghost"
-                    className="view-all"
-                    onClick={() => setShowAll(!showAll)}
-                  >
-                    {showAll ? 'Show fewer games' : `See all ${games.length} games`}
-                    <ArrowRight size={15} />
-                  </Button>
-                )}
-              </section>
-              <section className="panel openings-panel">
-                <div className="section-heading">
-                  <h2>Opening repertoire</h2>
-                  <ChessKnight size={19} />
-                </div>
-                <p className="panel-subtitle">
-                  Your most played openings in this review.
-                </p>
-                <div className="openings-list">
-                  {stats.openings.slice(0, 5).map((o) => {
-                    const losses = o.games - o.wins - o.draws;
-                    // A bar drawn from one or two games is dimmed rather than
-                    // drawn at full strength, so a single loss cannot look like
-                    // a collapsing repertoire.
-                    const parts = [o.wins, o.draws, losses];
-                    return (
-                      <div className="opening-row" key={`${o.colour}-${o.name}`}>
-                        <div className="opening-row-top">
-                          <div>
-                            <strong>{o.name}</strong>
-                            <span>
-                              {o.colour === 'w' ? 'As White' : 'As Black'} · {o.games}{' '}
-                              {o.games === 1 ? 'game' : 'games'}
-                            </span>
-                          </div>
-                          <b>
-                            {Math.round((o.wins / o.games) * 100)}
-                            <small>%</small>
-                          </b>
-                        </div>
-                        <div
-                          className={`result-bar ${o.games < 3 ? 'thin' : ''}`}
-                          role="img"
-                          aria-label={`${o.wins} won, ${o.draws} drawn, ${losses} lost, from ${o.games} ${o.games === 1 ? 'game' : 'games'}`}
-                        >
-                          {parts.map((count, i) =>
-                            count > 0 ? (
-                              <span
-                                key={i}
-                                className={['win', 'draw', 'loss'][i]}
-                                style={{ width: `${(count / o.games) * 100}%` }}
-                              />
-                            ) : null,
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="bar-legend">
-                  <span>
-                    <i /> Wins
-                  </span>
-                  <span>
-                    <i /> Draws
-                  </span>
-                  <span>
-                    <i /> Losses
-                  </span>
-                </div>
-                <p className="small-sample-note">
-                  Small samples are clues, not verdicts.
-                </p>
-              </section>
-            </div>
-          </>
-        )}
-        <details className="review-method">
-          <summary>
-            <CircleHelp size={15} /> About this review
-          </summary>
-          <div>
-            <p>
-              Trends use up to 40 completed, rated standard games from the eight latest
-              active months. Chess.com may take up to 12 hours to refresh its public data.
-              Ratings are those recorded in each game, not live account ratings.
-            </p>
-            <p>
-              Automatic move review covers your latest five games. Native Stockfish 18
-              evaluates positions on your server, and the original Rust analysis pipeline
-              verifies completed games, selects key moments and checks tactical patterns.
-              Reviews keep running when you close this tab and resume after a server
-              restart.
-            </p>
-            <p>
-              Each position uses 150,000 scan nodes and 1,000,000 confirmation nodes. Up
-              to three drops of at least two pawns, or changes to forced mate, are shown
-              per game. This search can miss mistakes. Evaluations are from your side;
-              history-dependent repetition is not inferred. The example is a saved native
-              Stockfish review of real completed games.
-            </p>
-            <p>
-              <a
-                href="https://support.chess.com/en/articles/9650547-what-is-the-pubapi-and-how-do-i-use-it"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Chess.com public data
-              </a>{' '}
-              ·{' '}
-              <a
-                href="https://github.com/official-stockfish/Stockfish/blob/sf_18/Copying.txt"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Stockfish GPLv3 licence
-              </a>{' '}
-              ·{' '}
-              <a
-                href="https://github.com/official-stockfish/Stockfish/tree/sf_18"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Engine source
-              </a>
-            </p>
-          </div>
-        </details>
-      </main>
-      <footer className="site-footer">
-        <span>Made for the player you’re becoming.</span>
+        <span>Make room for your next discovery.</span>
         <span>Independent of Chess.com.</span>
       </footer>
     </div>
+  );
+}
+function SparkIcon() {
+  return (
+    <span aria-hidden="true" className="small-star">
+      ✳
+    </span>
   );
 }
