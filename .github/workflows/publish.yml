@@ -1,5 +1,7 @@
 name: Publish Tempo image
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -57,6 +59,8 @@ jobs:
   manifest:
     needs: image
     runs-on: ubuntu-24.04
+    outputs:
+      image: ${{ steps.manifest.outputs.image }}
     steps:
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -65,11 +69,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Combine native AMD64 and ARM64 images
+        id: manifest
         env:
           REPOSITORY: ${{ github.repository }}
         run: |
           image="ghcr.io/${REPOSITORY,,}"
           docker buildx imagetools create --tag "$image:sha-$GITHUB_SHA" \
             "$image:sha-$GITHUB_SHA-amd64" "$image:sha-$GITHUB_SHA-arm64"
-          docker buildx imagetools inspect "$image:sha-$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
-          echo 'Use the displayed image name and digest in the manual Deploy Tempo workflow.' >> "$GITHUB_STEP_SUMMARY"
+          digest=$(docker buildx imagetools inspect "$image:sha-$GITHUB_SHA" \
+            --format '{{json .Manifest}}' | jq -er '.digest')
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          echo "image=$image@$digest" >> "$GITHUB_OUTPUT"
+          printf 'Published tested image: `%s@%s`\n\n' "$image" "$digest" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Pushes to main deploy automatically. This digest is also available for manual deployment or rollback.' >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: [checks, image, manifest]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy.yml
+    with:
+      image: ${{ needs.manifest.outputs.image }}
+    secrets: inherit

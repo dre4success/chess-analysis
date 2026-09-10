@@ -6,6 +6,12 @@ on:
         description: "Published image by digest: ghcr.io/owner/repo@sha256:…"
         required: true
         type: string
+  workflow_call:
+    inputs:
+      image:
+        description: "Tested image by digest: ghcr.io/owner/repo@sha256:…"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -26,8 +32,29 @@ jobs:
       DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
       REPOSITORY: ${{ github.repository }}
     steps:
+      - name: Skip superseded automatic deployments
+        id: current
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # This check runs after acquiring the production concurrency lock.
+          # Manual dispatch deliberately bypasses it so older digests can be restored.
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            latest_sha=$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+            if [[ "$GITHUB_REF" != refs/heads/main || "$GITHUB_SHA" != "$latest_sha" ]]; then
+              echo 'deploy=false' >> "$GITHUB_OUTPUT"
+              printf 'Skipped superseded deployment of `%s`; main is now `%s`.\n' \
+                "$GITHUB_SHA" "$latest_sha" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
+          echo 'deploy=true' >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        if: steps.current.outputs.deploy == 'true'
+        with:
+          ref: ${{ github.sha }}
       - name: Validate deployment configuration
+        if: steps.current.outputs.deploy == 'true'
         shell: bash
         run: |
           [[ "$TEMPO_IMAGE" =~ ^ghcr.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
@@ -37,6 +64,7 @@ jobs:
           [[ "$DEPLOY_PATH" =~ ^/[a-zA-Z0-9/_-]+$ && "$DEPLOY_PATH" != / ]]
           [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]]
       - name: Configure SSH
+        if: steps.current.outputs.deploy == 'true'
         env:
           SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
@@ -48,12 +76,14 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
       - name: Install Compose definition
+        if: steps.current.outputs.deploy == 'true'
         run: |
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "$DEPLOY_PORT" \
             "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
           scp -o BatchMode=yes -o StrictHostKeyChecking=yes -P "$DEPLOY_PORT" \
             compose.prod.yaml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/docker-compose.yml"
       - name: Pull and start the chosen image
+        if: steps.current.outputs.deploy == 'true'
         run: |
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "$DEPLOY_PORT" \
             "$DEPLOY_USER@$DEPLOY_HOST" "bash -s -- '$DEPLOY_PATH' '$TEMPO_IMAGE'" <<'REMOTE'
@@ -75,6 +105,25 @@ jobs:
           mv "$tag_tmp" tag.env
           printf '%s\n' "$TEMPO_IMAGE" > .deployed-image
           REMOTE
+      - name: Summarize healthy deployment
+        if: steps.current.outputs.deploy == 'true'
+        run: |
+          printf 'Deployed image: `%s`\n\n' "$TEMPO_IMAGE" >> "$GITHUB_STEP_SUMMARY"
+          route=$(ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "$DEPLOY_PORT" \
+            "$DEPLOY_USER@$DEPLOY_HOST" "bash -s -- '$DEPLOY_PATH'" <<'REMOTE'
+          set -euo pipefail
+          cd "$1"
+          container=$(docker compose -f docker-compose.yml --env-file .env --env-file tag.env ps -q tempo)
+          test -n "$container"
+          docker inspect --format '{{ index .Config.Labels "traefik.http.routers.tempo.rule" }}' "$container"
+          REMOTE
+          )
+          host_pattern='^Host\(`([a-zA-Z0-9][a-zA-Z0-9.-]*)`\)$'
+          if [[ "$route" =~ $host_pattern ]]; then
+            printf 'Production URL: https://%s\n' "${BASH_REMATCH[1]}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Container is healthy; no single public hostname was found.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Remove temporary SSH credentials
         if: always()
         run: rm -f ~/.ssh/id_ed25519
